@@ -37,6 +37,111 @@ A Ranger node installed in each home forms an instant community mesh network tha
 
 ---
 
+## Architecture
+
+### MVP Hardware Structure (Phase 1)
+
+The breadboard MVP centres on a single ESP32 DevKit v1. Every peripheral hangs off one of four buses — SPI for the radio, I2S for the microphone, the internal DAC for audio out, and I2C for the display — with GPIO handling the push-to-talk button, LEDs, and volume pot. Power comes from a LiPo cell through a TP4056 charger.
+
+```mermaid
+graph TB
+    subgraph POWER["Power"]
+        BAT["LiPo 3.7V 2000mAh"] --> TP["TP4056<br/>charge + protection"]
+        TP -->|3.3V| ESP
+    end
+
+    subgraph MCU["ESP32 DevKit v1 — 240MHz dual core"]
+        ESP["ESP32"]
+    end
+
+    subgraph RF["RF Front End"]
+        LORA["SX1276 / Ra-01<br/>433MHz"]
+        ANT["433MHz whip<br/>+ SMA"]
+        LORA --- ANT
+    end
+
+    subgraph AUDIO["Audio Path"]
+        MIC["INMP441<br/>I2S MEMS mic"]
+        AMP["BC547 NPN<br/>+ 100Ω"]
+        SPK["8Ω speaker"]
+        AMP --> SPK
+    end
+
+    subgraph UI["Controls and UI"]
+        PTT["PTT button<br/>GPIO0, active LOW"]
+        LEDS["TX LED GPIO2<br/>RX LED GPIO4"]
+        POT["Volume pot<br/>GPIO34 ADC"]
+        OLED["SSD1306 OLED<br/>128x32"]
+    end
+
+    MIC -->|"I2S: SCK 32, WS 25, SD 33"| ESP
+    ESP -->|"DAC1 GPIO25"| AMP
+    ESP <-->|"VSPI: SCK 18, MISO 19, MOSI 23, CS 5, RST 14"| LORA
+    LORA -->|"DIO0 IRQ GPIO26"| ESP
+    ESP <-->|"I2C"| OLED
+    PTT --> ESP
+    POT --> ESP
+    ESP --> LEDS
+```
+
+> **Note on the MVP audio output:** GPIO25 serves double duty as both the I2S word-select line for the microphone and DAC1 for speaker output. This is workable only because the device is half-duplex — it never captures and plays back at the same time. Phase 2 removes the conflict by moving speaker output to a MAX98357A I2S amplifier on GPIO22.
+
+### How the Device Works
+
+A transmission begins when the user holds PTT. Audio is captured, compressed roughly 40:1 by Codec2, optionally encrypted, wrapped in a 68-byte packet, and pushed out over LoRa. The receiving unit reverses the process. Work is split across both ESP32 cores: Core 0 handles the time-critical I2S DMA transfers, Core 1 does the CPU-heavy compression and radio control.
+
+```mermaid
+flowchart TB
+    START(["Idle — light sleep,<br/>LoRa in RX continuous"])
+
+    START -->|"PTT pressed"| TX_MODE
+    START -->|"DIO0 interrupt fires"| RX_MODE
+
+    subgraph TX_MODE["Transmit — PTT held"]
+        direction TB
+        T1["Mic capture into DMA ring buffer<br/><i>Core 0 · 20ms per frame</i>"]
+        T2["Codec2 encode @ 3200bps<br/><i>Core 1 · ~5ms</i>"]
+        T3["Buffer 8 frames → 64 bytes<br/><i>160ms</i>"]
+        T4{"Mode?"}
+        T5["AES-128 encrypt<br/><i>ESP32 hardware AES</i>"]
+        T6["Prepend header:<br/>UserID · Mode · Seq"]
+        T7["SPI write to SX1276 FIFO,<br/>transmit<br/><i>~60ms airtime @ SF7/BW500</i>"]
+
+        T1 --> T2 --> T3 --> T4
+        T4 -->|"0x01 encrypted unicast"| T5 --> T6
+        T4 -->|"0x00 open broadcast"| T6
+        T6 --> T7
+    end
+
+    T7 -.->|"433MHz RF · 2-15km<br/>depending on spreading factor"| R1
+
+    subgraph RX_MODE["Receive — DIO0 IRQ"]
+        direction TB
+        R1["Read FIFO over SPI"]
+        R2["Parse header, extract UserID"]
+        R3{"Addressed to<br/>this node?"}
+        R4["AES-128 decrypt"]
+        R5["Codec2 decode<br/><i>~3ms</i>"]
+        R6["Jitter buffer — 3 frames"]
+        R7["I2S / DAC → speaker<br/><i>Core 0 · ~1ms</i>"]
+        R8["Update OLED:<br/>UserID, RSSI, channel"]
+        DROP(["Discard packet"])
+
+        R1 --> R2 --> R3
+        R3 -->|"no"| DROP
+        R3 -->|"yes"| R4 --> R5 --> R6 --> R7
+        R2 --> R8
+    end
+
+    T7 -->|"PTT released"| START
+    R7 --> START
+    DROP --> START
+```
+
+End-to-end latency lands around **250ms**, dominated by the 160ms spent buffering eight Codec2 frames into a single LoRa payload. That is comfortably inside the range users tolerate for push-to-talk: cellular phones target 150ms, and analog radio typically runs 300-500ms.
+
+---
+
 ## Hardware Stack
 
 ### Primary Components (Phase 1 - Breadboard MVP)
