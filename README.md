@@ -2,6 +2,8 @@
 
 A low-power, handheld communication device built on LoRa (SX1276/SX1281) and ESP32. Operates independently of cellular towers, SIM cards, subscriptions, and government-controlled infrastructure. Designed for emergency and disaster response, field operations, remote area coordination, and encrypted private messaging.
 
+![First test setup in the hardware stack](Images/First_Setup.jpeg)
+
 ---
 
 ## The Problem
