@@ -13,25 +13,13 @@
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
-void setup() {
-    u8g2.begin();
-}
-
-void drawLogo(void) {
-    u8g2.setFontMode(1);
-    u8g2.setBitmapMode(1);
-    // string 6 copy 1
-    u8g2.setFont(u8g2_font_profont29_tr);
-    u8g2.drawStr(17, 42, "RANGER");
-}
-
 // [BEGIN lopaka generated]
 static const unsigned char image_paint_1_bits[] U8X8_PROGMEM = {0x00,0x01,0x83,0x02,0x03,0x0d,0x1b,0x0e,0x1b,0x16,0xdb,0x28,0xdb,0x10};
 static const unsigned char image_paint_31_bits[] U8X8_PROGMEM = {0x01};
 
 
 
-void drawStatus(void) {
+void drawMain(void) {
     u8g2.setFontMode(1);
     u8g2.setBitmapMode(1);
     // paint 1
@@ -47,20 +35,15 @@ void drawStatus(void) {
     u8g2.drawXBMP(126, 3, 1, 1, image_paint_31_bits);
 }
 
+
+void setup() {
+    u8g2.begin();
+}
 void loop(){
     u8g2.firstPage();
     do {
-        drawLogo();
+        drawMain();
     } while (u8g2.nextPage());
-    
-    delay(2000);
-    
-    u8g2.firstPage();
-    do {
-        drawStatus();
-    } while (u8g2.nextPage());
-    
-    delay(2000);
 };
 
 
