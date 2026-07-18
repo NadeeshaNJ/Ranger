@@ -28,7 +28,7 @@ const int ROW_TOP = 9;
 int selectedIndex = 0;
 int scrollOffset = 0;
 
-static const unsigned char image_gps_bits[] U8X8_PROGMEM = {0x1c,0x3e,0x63,0x63,0x36,0x3e,0x1c,0x08};
+static const unsigned char image_gps_bits[] U8X8_PROGMEM = {0x1c,0x3e,0x63,0x63,0x77,0x3e,0x1c,0x1c,0x08};
 static const unsigned char image_message_bits[] U8X8_PROGMEM = {0xff,0x01,0x01,0x01,0x55,0x01,0x01,0x01,0xff,0x01,0x18,0x00,0x04,0x00,0x02,0x00};
 static const unsigned char image_mic_bits[] U8X8_PROGMEM = {0x1c,0x1c,0x5d,0x5d,0x41,0x7f,0x08,0x1c};
 
@@ -76,13 +76,14 @@ void drawPeople(void) {
         u8g2.drawXBMP(105, iconY, 9, 8, image_message_bits);
         u8g2.drawXBMP(118, iconY, 7, 8, image_mic_bits);
         if (people[idx].hasGps) {
-            u8g2.drawXBMP(94, iconY, 7, 8, image_gps_bits);
+            u8g2.drawXBMP(94, iconY, 7, 9, image_gps_bits);
         }
     }
 
     u8g2.setDrawColor(1);
+    u8g2.setFont(u8g2_font_5x7_tr);
     u8g2.drawStr(3, 62, "Back");
-    u8g2.drawStr(51, 62, "People");
+    u8g2.drawStr(49, 62, "People");
 }
 void loop(){
     u8g2.firstPage();
