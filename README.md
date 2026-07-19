@@ -407,6 +407,12 @@ Design GPS section on isolated PCB peninsula:
 
 ---
 
+## Development Log
+
+Ongoing testing and prototype notes (OLED screens, LoRa examples, audio/mic tests, etc.) are tracked in [docs/development_log.md](docs/development_log.md).
+
+---
+
 ## Getting Started
 
 ### Prerequisites
