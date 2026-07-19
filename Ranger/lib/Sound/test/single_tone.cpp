@@ -2,7 +2,7 @@
 #include <driver/i2s.h>
 #include <math.h>
 
-#define MAX98357A_I2S_DIN  25
+#define MAX98357A_I2S_DIN  15
 #define MAX98357A_I2S_LRC  26
 #define MAX98357A_I2S_BCLK 27
 

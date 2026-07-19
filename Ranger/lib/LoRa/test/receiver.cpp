@@ -1,9 +1,10 @@
+#include <Arduino.h>
 /*********
   Rui Santos & Sara Santos - Random Nerd Tutorials
   Modified from the examples of the Arduino LoRa library
   More resources: https://RandomNerdTutorials.com/esp32-lora-rfm95-transceiver-arduino-ide/
 *********/
-#include <Arduino.h>
+
 #include <SPI.h>
 #include <LoRa.h>
 
@@ -12,13 +13,11 @@
 #define rst 14
 #define dio0 2
 
-int counter = 0;
-
 void setup() {
   //initialize Serial Monitor
   Serial.begin(115200);
   while (!Serial);
-  Serial.println("LoRa Sender");
+  Serial.println("LoRa Receiver");
 
   //setup LoRa transceiver module
   LoRa.setPins(ss, rst, dio0);
@@ -27,7 +26,7 @@ void setup() {
   //433E6 for Asia
   //868E6 for Europe
   //915E6 for North America
-  while (!LoRa.begin(868E6)) {
+  while (!LoRa.begin(433E6)) {
     Serial.println(".");
     delay(500);
   }
@@ -35,20 +34,34 @@ void setup() {
   // The sync word assures you don't get LoRa messages from other LoRa transceivers
   // ranges from 0-0xFF
   LoRa.setSyncWord(0xF3);
+  LoRa.setSyncWord(0xF3);
+
+  // --- Add these lines ---
+  LoRa.setTxPower(20, PA_OUTPUT_PA_BOOST_PIN); // max power, PA_BOOST pin (required for Ra-01)
+  LoRa.setSpreadingFactor(7);                  // SF7, good balance of range/speed
+  LoRa.setSignalBandwidth(125E3);              // 125kHz, standard
+  LoRa.enableCrc();                            // reject corrupted packets
+  // ------------------------
+
+  Serial.println("LoRa Initializing OK!");
   Serial.println("LoRa Initializing OK!");
 }
 
 void loop() {
-  Serial.print("Sending packet: ");
-  Serial.println(counter);
+  // try to parse packet
+  int packetSize = LoRa.parsePacket();
+  if (packetSize) {
+    // received a packet
+    Serial.print("Received packet '");
 
-  //Send LoRa packet to receiver
-  LoRa.beginPacket();
-  LoRa.print("hello ");
-  LoRa.print(counter);
-  LoRa.endPacket();
+    // read packet
+    while (LoRa.available()) {
+      String LoRaData = LoRa.readString();
+      Serial.print(LoRaData); 
+    }
 
-  counter++;
-
-  delay(10000);
+    // print RSSI of packet
+    Serial.print("' with RSSI ");
+    Serial.println(LoRa.packetRssi());
+  }
 }
