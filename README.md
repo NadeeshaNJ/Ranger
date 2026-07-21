@@ -298,16 +298,16 @@ Acceptable for push-to-talk operation (phones target 150ms, analog radio 300-500
 
 ### Phase 1: Breadboard MVP (Months 1-3)
 
-- [ ] ESP32 + SX1276 LoRa module on breadboard
-- [ ] INMP441 I2S microphone integration
-- [ ] Codec2 ESP32 port (`rebezhir/codec2-esp32`)
+- [x] ESP32 + SX1276 LoRa module on breadboard
+- [x] INMP441 I2S microphone integration
+- [x] Codec2 ESP32 port (`rebezhir/codec2-esp32`)
 - [ ] Local encode/decode quality validation
-- [ ] LoRa text packet exchange (two units)
-- [ ] Codec2 audio piped into LoRa packets
+- [x] LoRa text packet exchange (two units)
+- [x] Codec2 audio piped into LoRa packets
 - [ ] PTT state machine implementation
 - [ ] Custom packet header with UserID
 - [ ] Broadcast vs. encrypted unicast modes
-- [ ] BC547 speaker output
+- [x] BC547 speaker output
 
 ### Phase 2: Custom PCB + Expansion (Months 4-6)
 
