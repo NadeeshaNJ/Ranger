@@ -4,6 +4,8 @@ A running record of hands-on testing and prototypes built while bringing up the 
 
 ---
 
+![First test setup in the hardware stack](../Images/First_Setup.jpeg)
+
 ## 2026-07-17 — First OLED display bring-up (`357f88f`)
 
 Got the SSD1306 OLED talking over I2C using the U8g2 library.
@@ -25,6 +27,8 @@ Got the SSD1306 OLED talking over I2C using the U8g2 library.
 - `Ranger/lib/OLEDscreen/U8g2/Location.cpp` — GPS/location display screen.
 - `Ranger/lib/OLEDscreen/U8g2/Track.cpp` — device tracking screen.
 - `Ranger/lib/OLEDscreen/U8g2/people2.cpp` — revised people list layout.
+
+<img src="../Images/tracker_screen.jpeg" alt="Designing and testing OLED screen in the hardware stack" width="600" />
 
 ## 2026-07-19 — Chat message handling (`cd2ffab`)
 
