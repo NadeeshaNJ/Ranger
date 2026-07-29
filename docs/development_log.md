@@ -77,6 +77,17 @@ Fix: added a `vTaskDelay(pdMS_TO_TICKS(1))` at the end of each loop iteration in
 
 **Outcome:** stable, continuous Codec2 encoding and LoRa transmission from live microphone input, confirmed by uninterrupted "Sent encoded frame" output with no resets.
 
+## 2026-07-29 — PCF8575 button expander, interrupt-driven polling
+
+Bringing up a PCF8575 I2C I/O expander (addr `0x20`) for the 4-button + LED input stack, replacing the earlier Codec2/LoRa receiver sketch in `Ranger/src/main.cpp` for now.
+
+- `Ranger/lib/I2C_Button_Expand/test/4_buttons_with_debounce.cpp` — first pass: polls all 16 pins every loop iteration with per-button software debounce.
+- Realized straight polling doesn't hold up once `loop()` is doing real work (audio/LoRa), since the ESP32 can't keep checking button state on a tight timer without starving other tasks.
+- Wired the PCF8575's INT pin (GPIO27, active-low open-drain, pulses on any P0-P17 change) to an ESP32 external interrupt instead. The ISR just sets a `volatile buttonChanged` flag; `loop()` only calls `digitalReadAll()` and runs debounce logic when that flag is set.
+- `Ranger/lib/I2C_Button_Expand/test/interrupt_buttons.cpp` — interrupt-driven version, pinout documented in a header comment block (SDA/SCL/INT wiring, P1-P4 buttons, P10-P17 LEDs).
+- Ported the same interrupt-driven approach into `Ranger/src/main.cpp` and added `xreef/PCF8575 library@^2.0.1` to `platformio.ini`.
+- Split `Ranger/lib/Sound/test/single_tone.cpp` into `single_tone_MAX98357A.cpp` and `single_tone_PCM5100A.cpp` — same I2S tone-generation test, separate pin/wiring comments per DAC/amp board so both can be kept as reference without one overwriting the other's notes.
+
 ---
 
 *Add new entries above this line as testing continues.*
