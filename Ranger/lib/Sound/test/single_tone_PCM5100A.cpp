@@ -2,7 +2,7 @@
 #include <driver/i2s.h>
 #include <math.h>
 
-#define PCM5100A_I2S_DIN  15
+#define PCM5100A_I2S_DIN  25
 #define PCM5100A_I2S_LRC  26
 #define PCM5100A_I2S_BCLK 27
 

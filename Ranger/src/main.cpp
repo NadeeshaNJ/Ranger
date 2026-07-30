@@ -1,99 +1,66 @@
 #include <Arduino.h>
-#include <Wire.h>
-#include "PCF8575.h"
+#include <driver/i2s.h>
 
-// ---------------------------------------------------------------------------
-// Pinout
-// ---------------------------------------------------------------------------
-// ESP32          PCF8575 (I2C addr 0x20, A0/A1/A2 -> GND)
-// -----          --------------------------------------
-// GPIO21   ----- SDA
-// GPIO22   ----- SCL
-// GPIO27   ----- INT   (active low, opendrain -> needs pullup, triggers on
-//                        any P0-P17 change)
-// 3V3      ----- VCC
-// GND      ----- GND
-//
-// PCF8575 expander pins
-// ----------------------
-// P0     : unused   (INPUT)
-// P1-P4  : buttons  (INPUT)    -> button0=P1, button1=P2, button2=P3, button3=P4
-// P5-P7  : unused   (INPUT)
-// P10-P17: LEDs     (OUTPUT)
-// ---------------------------------------------------------------------------
-
-// Default address 0x20 when A0, A1, A2 are all grounded
-PCF8575 pcf8575(0x20);
-
-const int INT_PIN = 27; // optional, connect to PCF8575 INT
-
-const unsigned long debounceDelay = 50; // ms, tune per your buttons
-
-// Per-button debounce tracking (P1 to P4)
-unsigned long lastDebounceTime[4] = {0, 0, 0, 0};
-bool lastButtonState[4] = {HIGH, HIGH, HIGH, HIGH};
-
-volatile bool buttonChanged = false;
-
-void IRAM_ATTR onPcfInterrupt() {
-  buttonChanged = true;
-}
+// I2S pin definitions for ESP32
+#define I2S_BCK  26  // Bit clock pin
+#define I2S_LRCK 25  // Left-right clock pin (word select / LRCK / WS)
+#define I2S_DOUT 22  // Data out pin
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(21, 22); // SDA, SCL
+  delay(100);
 
-  // Set pin modes: P0 to P7 as inputs (buttons), P10 to P17 as outputs (LEDs)
-  for (int i = 0; i < 8; i++) {
-    pcf8575.pinMode(i, INPUT);
+  // Configure I2S driver
+  i2s_config_t i2s_config = {
+    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
+    .sample_rate = 44100,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
+    .intr_alloc_flags = 0,
+    .dma_buf_count = 8,
+    .dma_buf_len = 64,
+    .use_apll = false,
+    .tx_desc_auto_clear = true,
+    .fixed_mclk = 0
+  };
+
+  esp_err_t err = i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
+  if (err != ESP_OK) {
+    Serial.println("Failed to install I2S driver!");
+    while (1);
   }
-  for (int i = 8; i < 16; i++) {
-    pcf8575.pinMode(i, OUTPUT);
+
+  // Set I2S pins
+  i2s_pin_config_t pin_config = {
+    .bck_io_num = I2S_BCK,
+    .ws_io_num = I2S_LRCK,
+    .data_out_num = I2S_DOUT,
+    .data_in_num = I2S_PIN_NO_CHANGE
+  };
+
+  err = i2s_set_pin(I2S_NUM_0, &pin_config);
+  if (err != ESP_OK) {
+    Serial.println("Failed to set I2S pins!");
+    while (1);
   }
 
-  pcf8575.begin();
-
-  pinMode(INT_PIN, INPUT_PULLUP); // active low interrupt from PCF8575
-  attachInterrupt(digitalPinToInterrupt(INT_PIN), onPcfInterrupt, FALLING);
-}
-
-void handleButton(int index, bool currentState, int ledPin, const char* label) {
-  unsigned long now = millis();
-
-  if (now - lastDebounceTime[index] > debounceDelay) {
-    if (currentState != lastButtonState[index]) {
-      lastDebounceTime[index] = now;
-      lastButtonState[index] = currentState;
-
-      if (currentState == LOW) {
-        Serial.print("Button on ");
-        Serial.print(label);
-        Serial.println(" pressed");
-        pcf8575.digitalWrite(ledPin, HIGH);
-      } else {
-        pcf8575.digitalWrite(ledPin, LOW);
-      }
-    }
-  }
+  Serial.println("I2S initialized successfully.");
 }
 
 void loop() {
-  // Your complex code runs here, uninterrupted, most of the time.
+  // Example: Send a simple sine wave to the speaker module
+  static float phase = 0.0;
+  const float frequency = 440.0; // Frequency of the sine wave (A4 note)
+  const float amplitude = 16000.0; // Reduced amplitude for safety
+  const float sampleRate = 44100.0; // Sampling rate in Hz
 
-  if (buttonChanged) {
-    buttonChanged = false;
+  // Generate a sine wave sample (mono interleaved into 16-bit frame)
+  int16_t sample = (int16_t)(amplitude * sin(phase));
+  phase += 2.0 * PI * frequency / sampleRate;
+  if (phase >= 2.0 * PI) phase -= 2.0 * PI;
 
-    // Read all 16 pins at once
-    PCF8575::DigitalInput di = pcf8575.digitalReadAll();
-
-    bool button0 = di.p1;
-    bool button1 = di.p2;
-    bool button2 = di.p3;
-    bool button3 = di.p4;
-
-    handleButton(0, button0, P1, "P0");
-    handleButton(1, button1, P2, "P1");
-    handleButton(2, button2, P3, "P2");
-    handleButton(3, button3, P4, "P3");
-  }
+  // Write the sample to I2S (blocking)
+  size_t bytes_written = 0;
+  i2s_write(I2S_NUM_0, &sample, sizeof(sample), &bytes_written, portMAX_DELAY);
 }
