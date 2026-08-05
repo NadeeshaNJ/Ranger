@@ -1,0 +1,1091 @@
+{
+  "uuid": "dd58add3727c4eec66eec5aa274894ca",
+  "path": "Offline/Ranger_PCB",
+  "name": "Ranger_PCB",
+  "content": "",
+  "created_at": "2026-08-03 00:56:56",
+  "updated_at": "2026-08-05 23:48:18",
+  "stick": "",
+  "documents": [
+    {
+      "uuid": "3a91273987a03097d80f6f0a86590bc4",
+      "title": "ESP32",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "components": {
+        "1849596118e44adeab19582cd80f3a35": 1,
+        "7d19d6f006684f60afb0c218c16ed1d9": 1,
+        "d8f053c7be6548dfaa35e9f366e5c9ff": 2,
+        "97154f307c4b4954a8241d00b385a0c0": 2,
+        "df8405e2fa0e40a984c435ad4c8d5cf3": 1,
+        "fa776220301440be94e47ccd32b8a0e5": 2,
+        "96a6ec2e551e7bd0760067eb1fbc790e": 4,
+        "79ae21cdf2964e5fb89eb26a0b50ffe8": 2,
+        "337a0439103c001f49c44c5cf71bde4b": 1,
+        "dd4cd7e46bfa40038d2e178df6050fd4": 1,
+        "e514516b233a499d925471967be1f37e": 2
+      },
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ],
+        [
+          "1uF",
+          2,
+          "C0603",
+          "C1,C9",
+          {
+            "Manufacturer Part": "CL10B105KA8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C29936"
+          }
+        ],
+        [
+          "100nF",
+          9,
+          "C0603",
+          "C2,C3,C4,C5,C7,C10,C11,C13,C14",
+          {
+            "Manufacturer Part": "CL10B104KB8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C1591"
+          }
+        ],
+        [
+          "22uF",
+          2,
+          "C0603",
+          "C6,C12",
+          {
+            "Manufacturer Part": "CL10A226MP8NUNE",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C86295"
+          }
+        ],
+        [
+          "1000uF",
+          1,
+          "CAP-SMD_BD8.0-L8.3-W8.3-FD",
+          "C8",
+          {
+            "Manufacturer Part": "HV1A108M0810PZ",
+            "Manufacturer": "HONOR(荣誉)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5246520"
+          }
+        ],
+        [
+          "0.96OLED_4P",
+          1,
+          "0.96OLED_4P",
+          "OLED1",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "LCSC",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "MMBT3904TT1G",
+          2,
+          "SC-75-3_L1.6-W0.8-P1.00-LS1.6-BR",
+          "Q1,Q2",
+          {
+            "Manufacturer Part": "MMBT3904TT1G",
+            "Manufacturer": "onsemi(安森美)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C242260"
+          }
+        ],
+        [
+          "10kΩ",
+          7,
+          "R0603",
+          "R1,R2,R7,R8,R9,R10,R11",
+          {
+            "Manufacturer Part": "FRC0603F1002TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2906982"
+          }
+        ],
+        [
+          "5.1kΩ",
+          2,
+          "R0603",
+          "R3,R4",
+          {
+            "Manufacturer Part": "FRC0603F5101TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2907044"
+          }
+        ],
+        [
+          "4.7kΩ",
+          2,
+          "R0603",
+          "R5,R6",
+          {
+            "Manufacturer Part": "RC0603FR-074K7L",
+            "Manufacturer": "YAGEO(国巨)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C99782"
+          }
+        ],
+        [
+          "RESET",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW1",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "BOOT",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW2",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "EC12D1524403",
+          1,
+          "SW-TH_EC12D1524403",
+          "SW3",
+          {
+            "Manufacturer Part": "EC12D1524403",
+            "Manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C112349"
+          }
+        ],
+        [
+          "SKRPACE010",
+          16,
+          "KEY-SMD_4P-L4.2-W3.2-P2.20-LS4.6",
+          "SW4,SW5,SW6,SW7,SW8,SW9,SW10,SW11,SW12,SW13,SW14,SW15,SW16,SW17,SW18,SW19",
+          {
+            "Manufacturer Part": "SKRPACE010",
+            "Manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C139797"
+          }
+        ],
+        [
+          "ESP32-WROOM-32E(4MB)",
+          1,
+          "WIFI-SMD_ESP32-WROOM-32E",
+          "U1",
+          {
+            "Manufacturer Part": "ESP32-WROOM-32E-N4",
+            "Manufacturer": "ESPRESSIF(乐鑫)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C701341"
+          }
+        ],
+        [
+          "E28-2G4M27SX",
+          1,
+          "WIRELM-SMD_E28-2G4M27SX",
+          "U2",
+          {
+            "Manufacturer Part": "E28-2G4M27SX",
+            "Manufacturer": "EBYTE(亿佰特)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5333988"
+          }
+        ],
+        [
+          "CH343P",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.7",
+          "U3",
+          {
+            "Manufacturer Part": "CH343P",
+            "Manufacturer": "WCH(南京沁恒)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2846043"
+          }
+        ],
+        [
+          "ICS-43434_C5656610",
+          1,
+          "MIC-SMD_6P-L3.5-W2.7-P0.90-BL",
+          "U4",
+          {
+            "Manufacturer Part": "ICS-43434",
+            "Manufacturer": "TDK InvenSense(应美盛)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5656610"
+          }
+        ],
+        [
+          "MAX98357AETE+T",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.5",
+          "U5",
+          {
+            "Manufacturer Part": "MAX98357AETE+T",
+            "Manufacturer": "ADI(亚德诺)/MAXIM(美信)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C910544"
+          }
+        ],
+        [
+          "PCF8575DBR",
+          2,
+          "SSOP-24_L8.2-W5.3-P0.65-LS7.8-BL",
+          "U6,U7",
+          {
+            "Manufacturer Part": "PCF8575DBR",
+            "Manufacturer": "TI(德州仪器)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2863388"
+          }
+        ],
+        [
+          "TYPE-C-31-M-12",
+          1,
+          "USB-C_SMD-TYPE-C-31-M-12_1",
+          "USBC1",
+          {
+            "Manufacturer Part": "TYPE-C-31-M-12",
+            "Manufacturer": "韩国韩荣",
+            "Supplier": "LCSC",
+            "Supplier Part": "C165948"
+          }
+        ]
+      ],
+      "updateTime": 1785953257,
+      "createTime": 1785698817,
+      "histories": [],
+      "created_at": "2026-08-03 00:56:57",
+      "updated_at": "2026-08-05 23:37:37"
+    },
+    {
+      "uuid": "a07a5f95d3bbb1873dcfa983715cc5f9",
+      "title": "LoRa",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "components": {
+        "59fe833a7e1341b896f21fa0993e1267": 1,
+        "557427df238c4c4da100a7e1032b1077": 1,
+        "96a6ec2e551e7bd0760067eb1fbc790e": 1,
+        "337a0439103c001f49c44c5cf71bde4b": 1,
+        "d8f053c7be6548dfaa35e9f366e5c9ff": 1
+      },
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ],
+        [
+          "1uF",
+          2,
+          "C0603",
+          "C1,C9",
+          {
+            "Manufacturer Part": "CL10B105KA8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C29936"
+          }
+        ],
+        [
+          "100nF",
+          5,
+          "C0603",
+          "C2,C3,C4,C5,C7",
+          {
+            "Manufacturer Part": "CL10B104KB8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C1591"
+          }
+        ],
+        [
+          "22uF",
+          1,
+          "C0603",
+          "C6",
+          {
+            "Manufacturer Part": "CL10A226MP8NUNE",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C86295"
+          }
+        ],
+        [
+          "1000uF",
+          1,
+          "CAP-SMD_BD8.0-L8.3-W8.3-FD",
+          "C8",
+          {
+            "Manufacturer Part": "HV1A108M0810PZ",
+            "Manufacturer": "HONOR(荣誉)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5246520"
+          }
+        ],
+        [
+          "MMBT3904TT1G",
+          2,
+          "SC-75-3_L1.6-W0.8-P1.00-LS1.6-BR",
+          "Q1,Q2",
+          {
+            "Manufacturer Part": "MMBT3904TT1G",
+            "Manufacturer": "onsemi(安森美)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C242260"
+          }
+        ],
+        [
+          "10kΩ",
+          3,
+          "R0603",
+          "R1,R2,R7",
+          {
+            "Manufacturer Part": "FRC0603F1002TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2906982"
+          }
+        ],
+        [
+          "5.1kΩ",
+          2,
+          "R0603",
+          "R3,R4",
+          {
+            "Manufacturer Part": "FRC0603F5101TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2907044"
+          }
+        ],
+        [
+          "4.7kΩ",
+          2,
+          "R0603",
+          "R5,R6",
+          {
+            "Manufacturer Part": "RC0603FR-074K7L",
+            "Manufacturer": "YAGEO(国巨)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C99782"
+          }
+        ],
+        [
+          "RESET",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW1",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "BOOT",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW2",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "ESP32-WROOM-32E(4MB)",
+          1,
+          "WIFI-SMD_ESP32-WROOM-32E",
+          "U1",
+          {
+            "Manufacturer Part": "ESP32-WROOM-32E-N4",
+            "Manufacturer": "ESPRESSIF(乐鑫)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C701341"
+          }
+        ],
+        [
+          "E28-2G4M27SX",
+          1,
+          "WIRELM-SMD_E28-2G4M27SX",
+          "U2",
+          {
+            "Manufacturer Part": "E28-2G4M27SX",
+            "Manufacturer": "EBYTE(亿佰特)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5333988"
+          }
+        ],
+        [
+          "CH343P",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.7",
+          "U3",
+          {
+            "Manufacturer Part": "CH343P",
+            "Manufacturer": "WCH(南京沁恒)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2846043"
+          }
+        ],
+        [
+          "ICS-43434_C5656610",
+          1,
+          "MIC-SMD_6P-L3.5-W2.7-P0.90-BL",
+          "U4",
+          {
+            "Manufacturer Part": "ICS-43434",
+            "Manufacturer": "TDK InvenSense(应美盛)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5656610"
+          }
+        ],
+        [
+          "MAX98357AETE+T",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.5",
+          "U5",
+          {
+            "Manufacturer Part": "MAX98357AETE+T",
+            "Manufacturer": "ADI(亚德诺)/MAXIM(美信)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C910544"
+          }
+        ],
+        [
+          "TCA9555PWR",
+          1,
+          "TSSOP-24_L7.8-W4.4-P0.65-LS6.4-BL",
+          "U7",
+          {
+            "Manufacturer Part": "TCA9555PWR",
+            "Manufacturer": "TI(德州仪器)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C465732"
+          }
+        ],
+        [
+          "TYPE-C-31-M-12",
+          1,
+          "USB-C_SMD-TYPE-C-31-M-12_1",
+          "USBC1",
+          {
+            "Manufacturer Part": "TYPE-C-31-M-12",
+            "Manufacturer": "韩国韩荣",
+            "Supplier": "LCSC",
+            "Supplier Part": "C165948"
+          }
+        ]
+      ],
+      "updateTime": 1785855225,
+      "createTime": 1785699170,
+      "histories": [],
+      "created_at": "2026-08-03 01:02:50",
+      "updated_at": "2026-08-04 20:23:45"
+    },
+    {
+      "uuid": "4254276abe0eaa24920e364574be99d4",
+      "title": "Display, Buttons, LED",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "components": {
+        "2d44a45061784cca949017eb029031c6": 16,
+        "29c4e557353c4e48b0c662dff67f9d53": 2,
+        "96a6ec2e551e7bd0760067eb1fbc790e": 2,
+        "eea74e3a16f548f383486f844f2fd995": 1,
+        "d8f053c7be6548dfaa35e9f366e5c9ff": 4,
+        "4b3c72a18cf34d58a2005dd344742bdc": 1
+      },
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ],
+        [
+          "1uF",
+          2,
+          "C0603",
+          "C1,C9",
+          {
+            "Manufacturer Part": "CL10B105KA8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C29936"
+          }
+        ],
+        [
+          "100nF",
+          9,
+          "C0603",
+          "C2,C3,C4,C5,C7,C10,C11,C13,C14",
+          {
+            "Manufacturer Part": "CL10B104KB8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C1591"
+          }
+        ],
+        [
+          "22uF",
+          2,
+          "C0603",
+          "C6,C12",
+          {
+            "Manufacturer Part": "CL10A226MP8NUNE",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C86295"
+          }
+        ],
+        [
+          "1000uF",
+          1,
+          "CAP-SMD_BD8.0-L8.3-W8.3-FD",
+          "C8",
+          {
+            "Manufacturer Part": "HV1A108M0810PZ",
+            "Manufacturer": "HONOR(荣誉)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5246520"
+          }
+        ],
+        [
+          "0.96OLED_4P",
+          1,
+          "0.96OLED_4P",
+          "OLED1",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "LCSC",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "MMBT3904TT1G",
+          2,
+          "SC-75-3_L1.6-W0.8-P1.00-LS1.6-BR",
+          "Q1,Q2",
+          {
+            "Manufacturer Part": "MMBT3904TT1G",
+            "Manufacturer": "onsemi(安森美)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C242260"
+          }
+        ],
+        [
+          "10kΩ",
+          7,
+          "R0603",
+          "R1,R2,R7,R8,R9,R10,R11",
+          {
+            "Manufacturer Part": "FRC0603F1002TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2906982"
+          }
+        ],
+        [
+          "5.1kΩ",
+          2,
+          "R0603",
+          "R3,R4",
+          {
+            "Manufacturer Part": "FRC0603F5101TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2907044"
+          }
+        ],
+        [
+          "4.7kΩ",
+          2,
+          "R0603",
+          "R5,R6",
+          {
+            "Manufacturer Part": "RC0603FR-074K7L",
+            "Manufacturer": "YAGEO(国巨)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C99782"
+          }
+        ],
+        [
+          "RESET",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW1",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "BOOT",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW2",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "EC12D1524403",
+          1,
+          "SW-TH_EC12D1524403",
+          "SW3",
+          {
+            "Manufacturer Part": "EC12D1524403",
+            "Manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C112349"
+          }
+        ],
+        [
+          "SKRPACE010",
+          16,
+          "KEY-SMD_4P-L4.2-W3.2-P2.20-LS4.6",
+          "SW4,SW5,SW6,SW7,SW8,SW9,SW10,SW11,SW12,SW13,SW14,SW15,SW16,SW17,SW18,SW19",
+          {
+            "Manufacturer Part": "SKRPACE010",
+            "Manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C139797"
+          }
+        ],
+        [
+          "ESP32-WROOM-32E(4MB)",
+          1,
+          "WIFI-SMD_ESP32-WROOM-32E",
+          "U1",
+          {
+            "Manufacturer Part": "ESP32-WROOM-32E-N4",
+            "Manufacturer": "ESPRESSIF(乐鑫)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C701341"
+          }
+        ],
+        [
+          "E28-2G4M27SX",
+          1,
+          "WIRELM-SMD_E28-2G4M27SX",
+          "U2",
+          {
+            "Manufacturer Part": "E28-2G4M27SX",
+            "Manufacturer": "EBYTE(亿佰特)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5333988"
+          }
+        ],
+        [
+          "CH343P",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.7",
+          "U3",
+          {
+            "Manufacturer Part": "CH343P",
+            "Manufacturer": "WCH(南京沁恒)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2846043"
+          }
+        ],
+        [
+          "ICS-43434_C5656610",
+          1,
+          "MIC-SMD_6P-L3.5-W2.7-P0.90-BL",
+          "U4",
+          {
+            "Manufacturer Part": "ICS-43434",
+            "Manufacturer": "TDK InvenSense(应美盛)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5656610"
+          }
+        ],
+        [
+          "MAX98357AETE+T",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.5",
+          "U5",
+          {
+            "Manufacturer Part": "MAX98357AETE+T",
+            "Manufacturer": "ADI(亚德诺)/MAXIM(美信)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C910544"
+          }
+        ],
+        [
+          "PCF8575DBR",
+          2,
+          "SSOP-24_L8.2-W5.3-P0.65-LS7.8-BL",
+          "U6,U7",
+          {
+            "Manufacturer Part": "PCF8575DBR",
+            "Manufacturer": "TI(德州仪器)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2863388"
+          }
+        ],
+        [
+          "TYPE-C-31-M-12",
+          1,
+          "USB-C_SMD-TYPE-C-31-M-12_1",
+          "USBC1",
+          {
+            "Manufacturer Part": "TYPE-C-31-M-12",
+            "Manufacturer": "韩国韩荣",
+            "Supplier": "LCSC",
+            "Supplier Part": "C165948"
+          }
+        ]
+      ],
+      "updateTime": 1785953898,
+      "createTime": 1785699170,
+      "histories": [],
+      "created_at": "2026-08-03 01:02:50",
+      "updated_at": "2026-08-05 23:48:18"
+    },
+    {
+      "uuid": "ca0156b4b90f68cb58cd6b1e1dc065b9",
+      "title": "Mic and Speaker",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "components": {
+        "bb5ae0d2bf12487ea3dcd0a34e5b28ca": 1,
+        "906918f208bf46c7af6af1256c5c5b8d": 1,
+        "96a6ec2e551e7bd0760067eb1fbc790e": 2,
+        "dd4cd7e46bfa40038d2e178df6050fd4": 1
+      },
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ],
+        [
+          "1uF",
+          2,
+          "C0603",
+          "C1,C9",
+          {
+            "Manufacturer Part": "CL10B105KA8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C29936"
+          }
+        ],
+        [
+          "100nF",
+          9,
+          "C0603",
+          "C2,C3,C4,C5,C7,C10,C11,C13,C14",
+          {
+            "Manufacturer Part": "CL10B104KB8NNNC",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C1591"
+          }
+        ],
+        [
+          "22uF",
+          2,
+          "C0603",
+          "C6,C12",
+          {
+            "Manufacturer Part": "CL10A226MP8NUNE",
+            "Manufacturer": "SAMSUNG(三星)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C86295"
+          }
+        ],
+        [
+          "1000uF",
+          1,
+          "CAP-SMD_BD8.0-L8.3-W8.3-FD",
+          "C8",
+          {
+            "Manufacturer Part": "HV1A108M0810PZ",
+            "Manufacturer": "HONOR(荣誉)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5246520"
+          }
+        ],
+        [
+          "0.96OLED_4P",
+          1,
+          "0.96OLED_4P",
+          "OLED1",
+          {
+            "Manufacturer Part": "",
+            "Manufacturer": "",
+            "Supplier": "LCSC",
+            "Supplier Part": ""
+          }
+        ],
+        [
+          "MMBT3904TT1G",
+          2,
+          "SC-75-3_L1.6-W0.8-P1.00-LS1.6-BR",
+          "Q1,Q2",
+          {
+            "Manufacturer Part": "MMBT3904TT1G",
+            "Manufacturer": "onsemi(安森美)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C242260"
+          }
+        ],
+        [
+          "10kΩ",
+          7,
+          "R0603",
+          "R1,R2,R7,R8,R9,R10,R11",
+          {
+            "Manufacturer Part": "FRC0603F1002TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2906982"
+          }
+        ],
+        [
+          "5.1kΩ",
+          2,
+          "R0603",
+          "R3,R4",
+          {
+            "Manufacturer Part": "FRC0603F5101TS",
+            "Manufacturer": "FOJAN(富捷)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2907044"
+          }
+        ],
+        [
+          "4.7kΩ",
+          2,
+          "R0603",
+          "R5,R6",
+          {
+            "Manufacturer Part": "RC0603FR-074K7L",
+            "Manufacturer": "YAGEO(国巨)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C99782"
+          }
+        ],
+        [
+          "RESET",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW1",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "BOOT",
+          1,
+          "KEY-SMD_L4.0-W3.0-LS4.9-1",
+          "SW2",
+          {
+            "Manufacturer Part": "HX 3x4x2-2P-1.6N TACTILE SWITCH",
+            "Manufacturer": "hanxia(韩下)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C49234124"
+          }
+        ],
+        [
+          "EC12D1524403",
+          1,
+          "SW-TH_EC12D1524403",
+          "SW3",
+          {
+            "Manufacturer Part": "EC12D1524403",
+            "Manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C112349"
+          }
+        ],
+        [
+          "SKRPACE010",
+          16,
+          "KEY-SMD_4P-L4.2-W3.2-P2.20-LS4.6",
+          "SW4,SW5,SW6,SW7,SW8,SW9,SW10,SW11,SW12,SW13,SW14,SW15,SW16,SW17,SW18,SW19",
+          {
+            "Manufacturer Part": "SKRPACE010",
+            "Manufacturer": "ALPSALPINE(阿尔卑斯阿尔派)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C139797"
+          }
+        ],
+        [
+          "ESP32-WROOM-32E(4MB)",
+          1,
+          "WIFI-SMD_ESP32-WROOM-32E",
+          "U1",
+          {
+            "Manufacturer Part": "ESP32-WROOM-32E-N4",
+            "Manufacturer": "ESPRESSIF(乐鑫)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C701341"
+          }
+        ],
+        [
+          "E28-2G4M27SX",
+          1,
+          "WIRELM-SMD_E28-2G4M27SX",
+          "U2",
+          {
+            "Manufacturer Part": "E28-2G4M27SX",
+            "Manufacturer": "EBYTE(亿佰特)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5333988"
+          }
+        ],
+        [
+          "CH343P",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.7",
+          "U3",
+          {
+            "Manufacturer Part": "CH343P",
+            "Manufacturer": "WCH(南京沁恒)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2846043"
+          }
+        ],
+        [
+          "ICS-43434_C5656610",
+          1,
+          "MIC-SMD_6P-L3.5-W2.7-P0.90-BL",
+          "U4",
+          {
+            "Manufacturer Part": "ICS-43434",
+            "Manufacturer": "TDK InvenSense(应美盛)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C5656610"
+          }
+        ],
+        [
+          "MAX98357AETE+T",
+          1,
+          "TQFN-16_L3.0-W3.0-P0.50-BL-EP1.5",
+          "U5",
+          {
+            "Manufacturer Part": "MAX98357AETE+T",
+            "Manufacturer": "ADI(亚德诺)/MAXIM(美信)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C910544"
+          }
+        ],
+        [
+          "PCF8575DBR",
+          2,
+          "SSOP-24_L8.2-W5.3-P0.65-LS7.8-BL",
+          "U6,U7",
+          {
+            "Manufacturer Part": "PCF8575DBR",
+            "Manufacturer": "TI(德州仪器)",
+            "Supplier": "LCSC",
+            "Supplier Part": "C2863388"
+          }
+        ],
+        [
+          "TYPE-C-31-M-12",
+          1,
+          "USB-C_SMD-TYPE-C-31-M-12_1",
+          "USBC1",
+          {
+            "Manufacturer Part": "TYPE-C-31-M-12",
+            "Manufacturer": "韩国韩荣",
+            "Supplier": "LCSC",
+            "Supplier Part": "C165948"
+          }
+        ]
+      ],
+      "updateTime": 1785953257,
+      "createTime": 1785699170,
+      "histories": [],
+      "created_at": "2026-08-03 01:02:50",
+      "updated_at": "2026-08-05 23:37:37"
+    },
+    {
+      "uuid": "86f778a4bbe7ed3be783abaa0cd4cf85",
+      "title": "Power",
+      "description": "",
+      "docType": "1",
+      "master": "",
+      "thumb": "/images/thumb-default.png",
+      "components": {},
+      "BOM": [
+        [
+          "Value",
+          "Quantity",
+          "Package",
+          "Components",
+          "CustomPara"
+        ]
+      ],
+      "updateTime": 1785699170,
+      "createTime": 1785699170,
+      "histories": [],
+      "created_at": "2026-08-03 01:02:50",
+      "updated_at": "2026-08-03 01:02:50"
+    }
+  ],
+  "sort": [
+    "3a91273987a03097d80f6f0a86590bc4",
+    "a07a5f95d3bbb1873dcfa983715cc5f9",
+    "4254276abe0eaa24920e364574be99d4",
+    "ca0156b4b90f68cb58cd6b1e1dc065b9",
+    "86f778a4bbe7ed3be783abaa0cd4cf85"
+  ],
+  "title": "Ranger_PCB",
+  "foldername": "Ranger_PCB",
+  "schfilename": "Ranger_PCB.json",
+  "schfilemtime": 1785953898985
+}

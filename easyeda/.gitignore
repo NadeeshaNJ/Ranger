@@ -1,0 +1,4 @@
+*.lock
+*.tmp
+*~
+.DS_Store
