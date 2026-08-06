@@ -88,6 +88,15 @@ Bringing up a PCF8575 I2C I/O expander (addr `0x20`) for the 4-button + LED inpu
 - Ported the same interrupt-driven approach into `Ranger/src/main.cpp` and added `xreef/PCF8575 library@^2.0.1` to `platformio.ini`.
 - Split `Ranger/lib/Sound/test/single_tone.cpp` into `single_tone_MAX98357A.cpp` and `single_tone_PCM5100A.cpp` — same I2S tone-generation test, separate pin/wiring comments per DAC/amp board so both can be kept as reference without one overwriting the other's notes.
 
+## 2026-08-06 — EasyEDA Pro PCB design (`ec6d6ba`)
+
+Phase 2 custom PCB design committed to repo.
+
+- Schematic capture with all Phase 2 components: E28-2G4M27SX (SX1281 2.4GHz), MAX98357A I2S amplifier, AP63203 sync buck converter, GPS module connector, 4x3 keypad matrix.
+- 4-layer PCB layout with ground plane isolation, 50Ω RF trace from E28 antenna, bulk capacitance for 580mA TX spikes, via stitching around RF section.
+- GPS section designed as optional (solder bridge on 3.3V, DNP components for base models).
+- Keypad anti-ghosting via 1N4148 diodes; optional TCA9555 I2C expander footprint for future GPIO savings.
+
 ---
 
 *Add new entries above this line as testing continues.*
