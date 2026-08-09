@@ -97,6 +97,33 @@ Phase 2 custom PCB design committed to repo.
 - GPS section designed as optional (solder bridge on 3.3V, DNP components for base models).
 - Keypad anti-ghosting via 1N4148 diodes; optional TCA9555 I2C expander footprint for future GPIO savings.
 
+## 2026-08-06 — Phase 2 PCB documentation and BOM (`3659219`)
+
+Added comprehensive documentation for the Phase 2 PCB design.
+
+- `docs/Ranger_Phase2_PCB_README.md` — detailed pin connections, module specifications, power requirements, and I2C/SPI bus assignments.
+- Hardware connectivity reference for assembly and debugging.
+
+## 2026-08-07 — PCB Bill of Materials (`05dcd8b`, `87578fa`)
+
+Generated and committed the PCB component BOM files for procurement.
+
+- Complete list of all PCB components with part numbers, quantities, and specifications.
+
+## 2026-08-09 — Walkie-talkie functionality over LoRa (`e34d7f5`)
+
+Implemented push-to-talk (PTT) voice communication over LoRa.
+
+- Full-duplex voice transmission with PTT button integration.
+- Combines Codec2 encoding/decoding pipeline with LoRa radio for long-range wireless audio.
+- Real-time audio streaming from microphone to speaker over LoRa network.
+
+## 2026-08-09 — Charger component BOM update (`1c1ad94`)
+
+Added charger module specifications to the PCB BOM file.
+
+- Integrated power management component specifications for battery charging.
+
 ---
 
 *Add new entries above this line as testing continues.*
