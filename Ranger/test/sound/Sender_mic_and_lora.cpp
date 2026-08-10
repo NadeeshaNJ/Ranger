@@ -14,7 +14,7 @@
 
 #define ss   5
 #define rst  14
-#define dio0 2
+#define dio0 4
 
 int32_t rawBuffer[SAMPLES_PER_READ];
 
