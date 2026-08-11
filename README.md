@@ -64,33 +64,33 @@ graph TB
 
     subgraph AUDIO["Audio Path"]
         MIC["INMP441<br/>I2S MEMS mic"]
-        AMP["BC547 NPN<br/>+ 100Ω"]
-        SPK["8Ω speaker"]
+        AMP["PCM5100A<br/>I2S DAC (line level)"]
+        SPK["Amp / headphones"]
         AMP --> SPK
     end
 
     subgraph UI["Controls and UI"]
-        PTT["PTT button<br/>GPIO0, active LOW"]
+        PTT["PTT button<br/>GPIO12, active LOW"]
         LEDS["TX LED GPIO2<br/>RX LED GPIO4"]
         POT["Volume pot<br/>GPIO34 ADC"]
         OLED["SSD1306 OLED<br/>128x32"]
     end
 
-    MIC -->|"I2S: SCK 32, WS 25, SD 33"| ESP
-    ESP -->|"DAC1 GPIO25"| AMP
+    MIC -->|"I2S0: SCK 32, WS 25, SD 33"| ESP
+    ESP -->|"I2S1: BCK 27, WS 26, DIN 15"| AMP
     ESP <-->|"VSPI: SCK 18, MISO 19, MOSI 23, CS 5, RST 14"| LORA
-    LORA -->|"DIO0 IRQ GPIO26"| ESP
+    LORA -->|"DIO0 IRQ GPIO4"| ESP
     ESP <-->|"I2C"| OLED
     PTT --> ESP
     POT --> ESP
     ESP --> LEDS
 ```
 
-> **Note on the MVP audio output:** GPIO25 serves double duty as both the I2S word-select line for the microphone and DAC1 for speaker output. This is workable only because the device is half-duplex — it never captures and plays back at the same time. Phase 2 removes the conflict by moving speaker output to a MAX98357A I2S amplifier on GPIO22.
+> **Note on audio output:** GPIO25 cannot serve double duty as both the mic's I2S word-select line and DAC1 for speaker output. Being half-duplex does not rescue this — a GPIO assigned to two I2S peripherals leaves the second one with no data path whatever the timing, and the speaker stays silent. Speaker output is therefore a PCM5100A I2S DAC on its own pins (BCK 27, WS 26, DIN 15), with the mic keeping GPIO25 for word-select. The PCM5100A is line-level with no amplifier on board, so an external amp or headphones are needed for usable volume.
 
 ### How the Device Works
 
-A transmission begins when the user holds PTT. Audio is captured, compressed roughly 40:1 by Codec2, optionally encrypted, wrapped in a 68-byte packet, and pushed out over LoRa. The receiving unit reverses the process. Work is split across both ESP32 cores: Core 0 handles the time-critical I2S DMA transfers, Core 1 does the CPU-heavy compression and radio control.
+A transmission begins when the user holds PTT. Audio is captured, compressed roughly 40:1 by Codec2, optionally encrypted, wrapped in a 68-byte packet, and pushed out over LoRa. The receiving unit reverses the process. Work is split across both ESP32 cores: Core 0 captures from the mic and runs Codec2 encode, Core 1 handles radio control. Encoding sits with capture because that is where the 25 frames/sec deadline is; the two are joined by a short queue of encoded frames, so a blocking LoRa transmit on Core 1 never stalls the mic on Core 0. When that queue fills, the oldest frame is dropped and counted, which bounds latency instead of letting a backlog grow.
 
 ```mermaid
 flowchart TB
@@ -101,9 +101,9 @@ flowchart TB
 
     subgraph TX_MODE["Transmit — PTT held"]
         direction TB
-        T1["Mic capture into DMA ring buffer<br/><i>Core 0 · 20ms per frame</i>"]
-        T2["Codec2 encode @ 3200bps<br/><i>Core 1 · ~5ms</i>"]
-        T3["Buffer 8 frames → 64 bytes<br/><i>160ms</i>"]
+        T1["Mic capture into DMA ring buffer<br/><i>Core 0 · 40ms per frame</i>"]
+        T2["Codec2 encode @ 1300bps<br/><i>Core 0 · 320 samples → 7 bytes</i>"]
+        T3["Queue 4 frames → 28 bytes<br/><i>Core 1 drains · 160ms</i>"]
         T4{"Mode?"}
         T5["AES-128 encrypt<br/><i>ESP32 hardware AES</i>"]
         T6["Prepend header:<br/>UserID · Mode · Seq"]
@@ -153,8 +153,8 @@ End-to-end latency lands around **250ms**, dominated by the 160ms spent bufferin
 | Microcontroller | ESP32 DevKit v1 | Dual-core 240MHz, I2S, SPI, hardware AES |
 | LoRa Module | SX1276 (Ra-01, 433MHz) | RF transceiver |
 | Microphone | INMP441 I2S breakout | Digital MEMS mic, clean audio input |
-| Speaker Driver | BC547 NPN transistor + 100Ω resistor | Drives speaker from ESP32 DAC |
-| Speaker | 8Ω speaker | Audio output |
+| Audio DAC | PCM5100A I2S breakout | Line-level audio out, no shared-GPIO conflict with the mic |
+| Speaker | 8Ω speaker + external amp, or headphones | Audio output (PCM5100A is line level, not amplified) |
 | Battery | 3.7V 2000mAh LiPo | Power supply |
 | Charger | TP4056 module | LiPo charging + protection |
 | Antenna | 433MHz whip + SMA | RF coverage |
@@ -210,15 +210,15 @@ Use if SF7 bandwidth proves insufficient:
 ### ESP32 FreeRTOS Task Distribution
 
 ```
-Core 0: I2S drivers (mic RX + speaker TX DMA) [TIME CRITICAL]
-Core 1: Codec2 encode/decode, UI, LoRa SPI control [CPU HEAVY]
+Core 0: mic I2S RX + Codec2 encode      [TIME CRITICAL — 25 frames/sec]
+Core 1: LoRa SPI control, Codec2 decode, speaker I2S TX, UI
 ```
 
 ### Transmission Flow
 
 ```
-INMP441 I2S -> DMA ring buffer -> Codec2 encoder -> 8 frames buffered
--> 64-byte LoRa payload -> SX1276 SPI TX
+INMP441 I2S -> DMA ring buffer -> Codec2 encoder -> frame queue (Core 0)
+-> 4 frames drained -> 28-byte LoRa payload -> SX1276 SPI TX (Core 1)
 ```
 
 ### Reception Flow
@@ -242,13 +242,18 @@ SX1276 DIO0 IRQ -> FIFO read -> audio queue
 
 | Stage | Time |
 |-------|------|
-| Mic capture (1 Codec2 frame) | 20ms |
+| Mic capture (1 Codec2 frame @ 1300) | 40ms |
 | Codec2 encode | ~5ms |
-| Buffer 8 frames | 160ms |
-| LoRa TX airtime (SF7, BW500, 64B) | ~60ms |
+| Queue 4 frames | 160ms |
+| LoRa TX airtime (SF7, BW125, 28B) | ~36ms |
 | Codec2 decode | ~3ms |
 | DAC + speaker | ~1ms |
-| **Total** | **~250ms** |
+| **Total** | **~245ms** |
+
+Airtime scales with payload, not just preamble: at SF7/BW125 a 28-byte packet
+is ~36ms against ~26ms for 7 bytes, so batching helps but is not free. At 4
+frames per packet the link runs near 23% duty cycle, leaving room to trade
+data rate for range (roughly 2.5dB per step of SF).
 
 Acceptable for push-to-talk operation (phones target 150ms, analog radio 300-500ms).
 
@@ -265,7 +270,7 @@ Acceptable for push-to-talk operation (phones target 150ms, analog radio 300-500
 | MOSI | GPIO23 |
 | NSS/CS | GPIO5 |
 | RST | GPIO14 |
-| DIO0 (IRQ) | GPIO26 |
+| DIO0 (IRQ) | GPIO4 |
 
 ### INMP441 I2S Microphone
 
@@ -276,21 +281,28 @@ Acceptable for push-to-talk operation (phones target 150ms, analog radio 300-500
 | SD | GPIO33 |
 | L/R | GND (left channel) |
 
-### Speaker (BC547 Driver / MAX98357A)
+### PCM5100A I2S DAC (speaker out)
 
 | Signal | GPIO |
 |--------|------|
-| DAC out (MVP) | GPIO25 (DAC1) |
-| I2S DOUT (Phase 2) | GPIO22 |
+| BCK | GPIO27 |
+| WS (LRC) | GPIO26 |
+| DIN | GPIO15 |
+
+DIN must not be GPIO25 — that pin is the mic's word-select line, and one GPIO
+cannot be driven by both I2S peripherals.
 
 ### Controls & UI
 
 | Component | GPIO |
 |-----------|------|
-| PTT Button (active LOW, 10k pullup) | GPIO0 |
+| PTT Button (active LOW, internal pullup) | GPIO12 |
 | TX LED (red, 330Ω) | GPIO2 |
-| RX LED (green, 330Ω) | GPIO4 |
+| RX LED (green, 330Ω) | *unassigned — GPIO4 is DIO0* |
 | Volume Pot (ADC) | GPIO34 |
+
+GPIO34-39 are input-only with no internal pullup, so a PTT button on one of
+them floats and reads as permanently pressed — hence GPIO12.
 
 ---
 
@@ -300,14 +312,15 @@ Acceptable for push-to-talk operation (phones target 150ms, analog radio 300-500
 
 - [x] ESP32 + SX1276 LoRa module on breadboard
 - [x] INMP441 I2S microphone integration
-- [x] Codec2 ESP32 port (`rebezhir/codec2-esp32`)
+- [x] Codec2 ESP32 port (`caveman99/ESP32 Codec2`)
 - [ ] Local encode/decode quality validation
 - [x] LoRa text packet exchange (two units)
 - [x] Codec2 audio piped into LoRa packets
-- [ ] PTT state machine implementation
+- [x] PTT state machine implementation (debounced, GPIO12)
 - [ ] Custom packet header with UserID
 - [ ] Broadcast vs. encrypted unicast modes
-- [x] BC547 speaker output
+- [x] PCM5100A I2S speaker output
+- [x] Decoupled capture: mic task + frame queue, drop-oldest with counters
 
 ### Phase 2: Custom PCB + Expansion (Months 4-6)
 
@@ -382,7 +395,7 @@ Design GPS section on isolated PCB peninsula:
 
 | Library | Purpose | Link |
 |---------|---------|------|
-| Codec2 ESP32 Port | Voice compression | https://github.com/rebezhir/codec2-esp32 |
+| ESP32 Codec2 (`caveman99/ESP32 Codec2`) | Voice compression | https://github.com/caveman99/esp32-codec2 |
 | Arduino LoRa | LoRa transceiver control | https://github.com/sandeepmistry/arduino-LoRa |
 | Meshtastic | Reference mesh implementation | https://meshtastic.org |
 | FreeRTOS | Task scheduling (built into ESP32 IDF) | https://www.freertos.org |
@@ -427,14 +440,17 @@ Ongoing testing and prototype notes (OLED screens, LoRa examples, audio/mic test
 ```bash
 # Clone this repository
 git clone https://github.com/NadeeshaNJ/Ranger.git
-cd Ranger
+cd Ranger/Ranger
 
-# Install Codec2 ESP32 dependency
-git clone https://github.com/rebezhir/codec2-esp32.git lib/codec2-esp32
+# Dependencies (including Codec2) come from lib_deps in platformio.ini,
+# so PlatformIO fetches them on the first build — no manual clone needed.
 
-# Open in Arduino IDE or PlatformIO
-# Configure board: ESP32 DevKit v1
-# Select COM port and flash
+# Build and flash each node. The two environments differ only in which
+# USB bridge they target; the firmware is identical.
+pio run -e node_a -t upload
+pio run -e node_b -t upload
+
+pio device monitor -e node_a
 ```
 
 ### Testing Checklist

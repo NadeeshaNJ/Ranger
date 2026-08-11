@@ -25,6 +25,11 @@
 #define TOTAL_SAMPLES     (SAMPLE_RATE * RECORD_SECONDS)   // 32000 mono samples
 #define READ_CHUNK        512                              // stereo int32 samples per i2s_read
 
+// Software playback gain, applied per sample on the way to the DAC.
+// Raise for more volume; past the point where speech peaks reach +/-32767 the
+// clamp below just flattens the tops and it starts to sound distorted.
+#define PLAYBACK_GAIN     6
+
 // 32000 samples * 2 bytes = 64000 bytes, fine for ESP32 SRAM
 static int16_t audioBuffer[TOTAL_SAMPLES];
 
@@ -119,8 +124,15 @@ void playAudio() {
 
     // Duplicate mono sample into L and R slots, same as the tone-generator code
     for (int j = 0; j < chunkSamples; j++) {
-      writeBuf[j * 2]     = audioBuffer[i + j];
-      writeBuf[j * 2 + 1] = audioBuffer[i + j];
+      // Widen to 32-bit before scaling so the multiply cannot wrap around,
+      // then clamp back into int16 range. Doing this in int16 would turn a
+      // loud sample into a loud sample of the OPPOSITE sign -- nasty crackle.
+      int32_t amplified = (int32_t)audioBuffer[i + j] * PLAYBACK_GAIN;
+      if (amplified > 32767) amplified = 32767;
+      if (amplified < -32768) amplified = -32768;
+
+      writeBuf[j * 2]     = (int16_t)amplified;
+      writeBuf[j * 2 + 1] = (int16_t)amplified;
     }
 
     i2s_write(I2S_NUM_1, writeBuf, chunkSamples * 2 * sizeof(int16_t), &bytesWritten, portMAX_DELAY);

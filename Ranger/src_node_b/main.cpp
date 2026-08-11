@@ -10,17 +10,30 @@
   LoRa (Ra-01/SX1278): NSS=5, RST=14, DIO0=4
   PTT button: GPIO12 -> other leg to GND (uses internal pull-up)
 
-  Audio chain:
+  Pin assignments and the PTT/debounce logic come from w_t_serial.cpp, which
+  is known working on hardware. What is new here is the Codec2 audio path:
+
     mic 32-bit @8kHz -> 16-bit PCM -> Codec2 1300 -> LoRa -> Codec2 decode
     -> gain -> 16-bit stereo -> DAC
 
-  Codec2 REQUIRES an 8 kHz sample rate, so both I2S peripherals run at 8 kHz
-  here (the raw-sample sketches used 16 kHz).
+  The raw-sample version needed ~500 packets/sec to keep up at 16 kHz, but
+  SF7/125kHz tops out near 28 -- hence the choppy audio. Codec2 compresses
+  40 ms of speech into 7 bytes, which fits the link with room to spare.
+
+  Capture runs in its own task rather than inline in loop(). The mic clocks
+  continuously whether or not anyone reads it, so any stretch spent inside
+  LoRa.endPacket() was a stretch where the I2S DMA ring kept filling with
+  nobody draining it. Once those four buffers wrap, the oldest audio is
+  overwritten by the driver and the speech develops a gap every packet.
+  micTask now owns the mic and never stops reading; loop() only ever pulls
+  already-encoded frames out of a queue, so transmit time no longer steals
+  from capture time.
 */
 
 #include <Arduino.h>
 #include <SPI.h>
 #include <LoRa.h>
+#include <string.h>
 #include <driver/i2s.h>
 #include <codec2.h>
 
@@ -51,11 +64,11 @@
 // I2S feed at 115200 baud, so packets are counted and summarised instead.
 #define RX_REPORT_MS  1000
 
-// Codec2 only runs at 8 kHz.
+// Codec2 only runs at 8 kHz -- the raw-sample sketches used 16 kHz.
 #define SAMPLE_RATE   8000
 
 // Mode 1300: 320 samples (40 ms) in, 52 bits = 7 bytes out, 25 frames/sec.
-// Verified against codec2_samples_per_frame()/codec2_bits_per_frame() at boot.
+// Checked against codec2_samples_per_frame()/codec2_bits_per_frame() at boot.
 #define CODEC2_MODE       CODEC2_MODE_1300
 #define FRAME_SAMPLES     320
 #define FRAME_BYTES       7
@@ -67,20 +80,63 @@
 #define FRAMES_PER_PACKET 4
 #define PACKET_BYTES      (FRAME_BYTES * FRAMES_PER_PACKET)
 
-// Playback gain. The PCM5100A is a line-level DAC with no amplifier, so this
-// only maximises the signal it hands to whatever amp/headphones follow it --
-// it cannot make a bare speaker loud. Raise carefully: too high just clips.
+// Software playback gain, same idea as the record/playback sketch. The
+// PCM5100A is a line-level DAC with no amplifier, so this only maximises the
+// signal handed to whatever amp/headphones follow -- it cannot make a bare
+// speaker loud. Too high and the clamp below just flattens the peaks.
 #define PLAYBACK_GAIN  6
 
-struct CODEC2 *codec2State = NULL;
+// Depth of the encoded-frame queue between micTask and loop(). Two packets'
+// worth: enough to ride out one LoRa transmit without stalling capture, small
+// enough that a backlog cannot grow into audible lag. At 40 ms per frame this
+// caps added latency at ~320 ms.
+#define FRAME_QUEUE_LEN   (FRAMES_PER_PACKET * 2)
+
+// Two separate Codec2 instances, one per task. A CODEC2 handle carries mutable
+// internal state (pitch/energy history, LSP predictor memory) that encode and
+// decode both write through. Sharing a single handle across the two cores let
+// micTask's encode reshuffle state while loop() was inside decode, which
+// crashed with LoadProhibited on the first PTT press after a receive.
+// Two handles cost ~5 kB extra RAM and make the paths genuinely independent.
+struct CODEC2 *encodeState = NULL;   // micTask / core 0 only
+struct CODEC2 *decodeState = NULL;   // loop() / core 1 only
+
+// One encoded Codec2 frame in flight between the two tasks.
+typedef struct {
+  uint8_t bytes[FRAME_BYTES];
+} EncodedFrame;
+
+// micTask -> loop(). Carries encoded frames, not raw PCM: 7 bytes per frame
+// instead of 640, so the queue costs almost nothing and the expensive
+// codec2_encode() happens on the capture side where the deadline actually is.
+QueueHandle_t frameQueue = NULL;
+TaskHandle_t micTaskHandle = NULL;
+
+// Set true by loop() while PTT is held. micTask watches this instead of
+// reading the pin itself, so debounce stays in one place.
+volatile bool captureEnabled = false;
+
+// Overrun bookkeeping, all written by micTask and read by loop() for the
+// periodic report. Counters are single-writer so they need no lock; they are
+// only ever incremented in one task and printed in the other.
+volatile uint32_t framesCaptured = 0;
+volatile uint32_t framesDropped = 0;   // dropped because the queue was full
+volatile uint32_t shortReads = 0;      // mic delivered less than a full frame
 
 // Mic reads are stereo int32; only the left slot carries data (L/R tied low),
 // so we need 2x the samples to fill one mono Codec2 frame.
+// rawBuffer/pcmFrame belong to micTask; decodedFrame/playBuf/packetBuf belong
+// to loop(). With encode/decode split onto their own Codec2 handles above,
+// the only thing crossing tasks is frameQueue, which is already thread-safe.
 int32_t rawBuffer[FRAME_SAMPLES * 2];
 int16_t pcmFrame[FRAME_SAMPLES];
 int16_t decodedFrame[FRAME_SAMPLES];
 int16_t playBuf[FRAME_SAMPLES * 2];   // interleaved L/R
 uint8_t packetBuf[PACKET_BYTES];
+
+// Defined below setup(), which starts the task and drains the queue.
+void micTask(void *param);
+void flushFrameQueue();
 
 void setupMicI2S() {
   i2s_config_t i2s_config = {
@@ -131,6 +187,7 @@ void setupSpeakerI2S() {
   i2s_set_pin(I2S_NUM_1, &pin_config);
 }
 
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -138,16 +195,17 @@ void setup() {
 
   pinMode(PTT_PIN, INPUT_PULLUP);
 
-  codec2State = codec2_create(CODEC2_MODE);
-  if (codec2State == NULL) {
+  encodeState = codec2_create(CODEC2_MODE);
+  decodeState = codec2_create(CODEC2_MODE);
+  if (encodeState == NULL || decodeState == NULL) {
     Serial.println("codec2_create failed, halting.");
     while (true) delay(1000);
   }
 
   // The buffer sizes above are compile-time constants; make sure the codec
   // actually agrees rather than silently overrunning them.
-  int spf = codec2_samples_per_frame(codec2State);
-  int bpf = (codec2_bits_per_frame(codec2State) + 7) / 8;
+  int spf = codec2_samples_per_frame(encodeState);
+  int bpf = (codec2_bits_per_frame(encodeState) + 7) / 8;
   if (spf != FRAME_SAMPLES || bpf != FRAME_BYTES) {
     Serial.printf("Codec2 geometry mismatch: %d samples / %d bytes, halting.\n", spf, bpf);
     while (true) delay(1000);
@@ -168,6 +226,35 @@ void setup() {
   LoRa.setSpreadingFactor(7);
   LoRa.setSignalBandwidth(125E3);
   LoRa.enableCrc();
+
+  frameQueue = xQueueCreate(FRAME_QUEUE_LEN, sizeof(EncodedFrame));
+  if (frameQueue == NULL) {
+    Serial.println("frameQueue alloc failed, halting.");
+    while (true) delay(1000);
+  }
+
+  // Pinned to core 0; the Arduino loop() runs on core 1. Splitting them is what
+  // lets capture continue during a blocking LoRa.endPacket().
+  // Priority 2 puts it above loop() (priority 1) so a ready frame is encoded
+  // promptly rather than waiting on the transmit side.
+  //
+  // 32 kB stack. Codec2 does NOT keep its working buffers in the handle; it
+  // puts large FFT arrays on the stack at every level. Frame sizes read from
+  // the built firmware's `entry` instructions:
+  //
+  //   analyse_one_frame  12352 B   (three COMP[FFT_ENC] = 3 * 512 * 8)
+  //     nlp               8256 B   (two COMP[PE_FFT_SIZE])
+  //
+  // so the encode chain alone needs ~20.6 kB before call overhead. Earlier
+  // guesses of 4 kB and 20 kB both tripped the canary -- the second one landed
+  // just under the true peak. 32 kB leaves real headroom; watch the
+  // high-water print on PTT release rather than trusting this number.
+  BaseType_t ok = xTaskCreatePinnedToCore(
+      micTask, "micTask", 32768, NULL, 2, &micTaskHandle, 0);
+  if (ok != pdPASS) {
+    Serial.println("micTask create failed, halting.");
+    while (true) delay(1000);
+  }
 
   Serial.println("Ready. Hold the PTT button to talk.");
 }
@@ -197,7 +284,10 @@ bool pttPressed() {
 // Returns false if the mic delivered short.
 bool readMicFrame() {
   size_t bytesRead = 0;
-  i2s_read(I2S_NUM_0, (void*)rawBuffer, sizeof(rawBuffer), &bytesRead, portMAX_DELAY);
+  // A bounded wait rather than portMAX_DELAY: one frame is only 40 ms of audio,
+  // so 200 ms is generous. If the mic ever stops clocking this returns short
+  // instead of blocking forever and taking the watchdog down with it.
+  i2s_read(I2S_NUM_0, (void*)rawBuffer, sizeof(rawBuffer), &bytesRead, pdMS_TO_TICKS(200));
 
   int stereoSamples = bytesRead / sizeof(int32_t);
   int collected = 0;
@@ -215,9 +305,65 @@ bool readMicFrame() {
   return (collected == FRAME_SAMPLES);
 }
 
+// Capture side. Runs forever, pinned opposite the Arduino loop so a blocking
+// LoRa transmit on one core cannot delay the mic on the other.
+//
+// While PTT is held this reads back-to-back with no delay of its own: i2s_read
+// blocks until a frame's worth of audio exists, which paces the loop at exactly
+// 25 Hz and yields to the scheduler for free. That is the whole point -- the
+// mic is never left unread.
+void micTask(void *param) {
+  (void)param;
+
+  for (;;) {
+    if (!captureEnabled) {
+      // Idle. Nothing is draining I2S_NUM_0 here, but that is harmless while
+      // not transmitting -- the DMA ring just recycles stale audio, and the
+      // zero below discards it so the next PTT press starts clean rather than
+      // sending a few frames of whatever was captured before it.
+      vTaskDelay(pdMS_TO_TICKS(20));
+      continue;
+    }
+
+    if (!readMicFrame()) {
+      shortReads++;
+      continue;    // mic stalled; try again rather than emitting a partial frame
+    }
+
+    EncodedFrame frame;
+    codec2_encode(encodeState, frame.bytes, pcmFrame);
+    framesCaptured++;
+
+    // Drop-oldest on a full queue. The alternative -- blocking here -- would
+    // just move the overflow back into the I2S DMA ring where it is invisible.
+    // Discarding the stale frame instead keeps latency bounded and guarantees
+    // that what goes out is the most recent speech.
+    if (xQueueSend(frameQueue, &frame, 0) != pdTRUE) {
+      EncodedFrame discard;
+      if (xQueueReceive(frameQueue, &discard, 0) == pdTRUE) {
+        framesDropped++;
+      }
+      // Retry once. If it still fails, loop() drained concurrently and the
+      // next iteration will find room, so the frame is simply let go.
+      if (xQueueSend(frameQueue, &frame, 0) != pdTRUE) {
+        framesDropped++;
+      }
+    }
+  }
+}
+
+// Discard anything left in the queue. Called on PTT edges so a new
+// transmission never starts by sending audio captured before the press.
+void flushFrameQueue() {
+  EncodedFrame discard;
+  while (xQueueReceive(frameQueue, &discard, 0) == pdTRUE) {
+    // drain
+  }
+}
+
 // Decode one frame and push it to the DAC with gain applied.
 void playFrame(const uint8_t *bits) {
-  codec2_decode(codec2State, decodedFrame, (unsigned char *)bits);
+  codec2_decode(decodeState, decodedFrame, (unsigned char *)bits);
 
   for (int i = 0; i < FRAME_SAMPLES; i++) {
     // Widen to 32-bit before scaling so the multiply cannot wrap, then clamp.
@@ -230,7 +376,7 @@ void playFrame(const uint8_t *bits) {
   }
 
   size_t bytesWritten = 0;
-  i2s_write(I2S_NUM_1, playBuf, FRAME_SAMPLES * 2 * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+  i2s_write(I2S_NUM_1, playBuf, FRAME_SAMPLES * 2 * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(200));
 }
 
 void loop() {
@@ -239,21 +385,44 @@ void loop() {
 
   if (talking && !wasTalking) {
     i2s_stop(I2S_NUM_1); // mute speaker the moment PTT is pressed
+    flushFrameQueue();   // discard pre-press audio
+    framesCaptured = 0;
+    framesDropped = 0;
+    shortReads = 0;
+    captureEnabled = true;
     Serial.println("PTT pressed, transmitting...");
   }
   if (!talking && wasTalking) {
+    captureEnabled = false;
+    // High-water marks are the smallest free stack ever seen, in bytes. If
+    // either approaches zero the canary is about to trip, so report them
+    // alongside the frame counters rather than waiting for a crash.
+    Serial.printf("PTT released: %u frames captured, %u dropped, %u short reads\n",
+                  (unsigned)framesCaptured, (unsigned)framesDropped,
+                  (unsigned)shortReads);
+    Serial.printf("  stack free: micTask %u B, loop %u B\n",
+                  (unsigned)uxTaskGetStackHighWaterMark(micTaskHandle),
+                  (unsigned)uxTaskGetStackHighWaterMark(NULL));
+    flushFrameQueue();   // do not transmit leftovers after the release
     i2s_start(I2S_NUM_1); // bring speaker back to life when PTT is released
-    Serial.println("PTT released, listening...");
+    Serial.println("Listening...");
   }
   wasTalking = talking;
 
   if (talking) {
-    // ---- TRANSMIT: mic -> Codec2 -> batch of frames -> LoRa ----
+    // ---- TRANSMIT: drain encoded frames from micTask -> LoRa ----
+    // No mic access here at all. This blocks only on the queue, and micTask
+    // keeps filling it throughout the LoRa transmit below.
     int framesReady = 0;
 
     while (framesReady < FRAMES_PER_PACKET) {
-      if (!readMicFrame()) return;   // short read, drop this batch
-      codec2_encode(codec2State, &packetBuf[framesReady * FRAME_BYTES], pcmFrame);
+      EncodedFrame frame;
+      // One frame is 40 ms of audio; 200 ms of patience means a genuinely
+      // stalled mic falls through with a partial batch instead of hanging.
+      if (xQueueReceive(frameQueue, &frame, pdMS_TO_TICKS(200)) != pdTRUE) {
+        break;
+      }
+      memcpy(&packetBuf[framesReady * FRAME_BYTES], frame.bytes, FRAME_BYTES);
       framesReady++;
 
       // Bail out mid-batch if PTT was released, so we don't keep keying.
@@ -265,6 +434,10 @@ void loop() {
       LoRa.write(packetBuf, framesReady * FRAME_BYTES);
       LoRa.endPacket();
     }
+
+    // endPacket() is blocking, so yield to let IDLE1 run and keep the Timer
+    // Group watchdog quiet (TG1WDT_SYS_RESET without this).
+    vTaskDelay(1);
 
   } else {
     // ---- RECEIVE: LoRa -> Codec2 decode -> gain -> DAC ----
@@ -293,6 +466,7 @@ void loop() {
 
       for (int f = 0; f < framesIn; f++) {
         playFrame(&packetBuf[f * FRAME_BYTES]);
+        vTaskDelay(1); // decoding 4 frames back to back starves IDLE0 too
       }
     }
 
@@ -308,6 +482,11 @@ void loop() {
         Serial.print(lastRssi);
         Serial.print(" dBm, SNR ");
         Serial.println(lastSnr);
+      } else if (framesDropped > 0 || shortReads > 0) {
+        // Surface capture problems from the last transmission even while idle,
+        // so a dropping mic is not hidden behind a quiet receive path.
+        Serial.printf("RX idle (last TX: %u dropped, %u short reads)\n",
+                      (unsigned)framesDropped, (unsigned)shortReads);
       } else {
         Serial.println("RX idle (no packets)");
       }
