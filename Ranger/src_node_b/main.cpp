@@ -1,212 +1,127 @@
 /*
-  Walkie-Talkie over LoRa, Push-to-Talk, Codec2 compressed
-  ----------------------------------------------------------
-  Flash this SAME sketch to both boards.
-  Hold the PTT button to transmit your mic audio.
-  Release it to listen and hear whatever the other board sends.
+  Walkie-Talkie over LoRa -- V2, same behaviour as V1_noisy.cpp, rewritten
+  against the lib/ libraries.
 
-  Hardware lives in lib/: Mic (INMP441), Sound (PCM5100A), Radio (SX1278),
-  Codec (Codec2), Buttons (PTT). This file is just the state machine and the
-  wiring between them.
+  Functionally identical to V1: half-duplex PTT, Codec2 1300, 4 frames per
+  packet, capture in its own task with a drop-oldest queue, receive squelch.
+  What changed is that every piece of hardware handling now lives behind a
+  library, so this file is only the state machine:
 
-    mic 32-bit @8kHz -> 16-bit PCM -> Codec2 1300 -> LoRa -> Codec2 decode
-    -> gain -> 16-bit stereo -> DAC
+    Mic      lib/Mic       I2S capture and 32->16 bit conversion
+    Sound    lib/Sound     I2S playback, start/stop, tone generator
+    Radio    lib/Radio     LoRa modem setup and packet I/O
+    Codec    lib/Codec     Codec2 handle, one per direction
+    FrameQueue lib/Codec   drop-oldest queue between the two tasks
+    Button   lib/Buttons   debounced PTT
 
-  Capture runs in its own task rather than inline in loop(). The mic clocks
-  continuously whether or not anyone reads it, so any stretch spent inside a
-  blocking LoRa transmit was a stretch where the I2S DMA ring kept filling
-  with nobody draining it, and the speech developed a gap every packet.
-  micTask now owns the mic and never stops reading; loop() only ever pulls
-  already-encoded frames out of a queue.
+  V1 is kept for reference because it is the version whose behaviour was
+  actually observed on hardware; this one should behave the same.
 */
 
 #include <Arduino.h>
-#include <string.h>
+
+#include <Wire.h>
 
 #include <Buttons.h>
 #include <Codec.h>
+#include <FrameQueue.h>
+#include <Keypad.h>
 #include <Mic.h>
 #include <Radio.h>
+#include <Screen.h>
 #include <Sound.h>
+#include <UI.h>
 
-// ---- Mic pins (I2S_NUM_0) ----
+// ---- Pins ----
 #define MIC_SCK_PIN   32
 #define MIC_WS_PIN    25
 #define MIC_SD_PIN    33
 
-// ---- Speaker pins (I2S_NUM_1, PCM5100A) ----
-#define SPK_WS_PIN    26
 #define SPK_BCK_PIN   27
-// DIN must NOT be 25 -- that is the mic's WS line. Sharing one GPIO between
-// I2S_NUM_0 and I2S_NUM_1 leaves the DAC with no data and the speaker silent.
+#define SPK_WS_PIN    26
+// DIN must NOT be 25 -- that is the mic's WS line. One GPIO cannot be driven
+// by two I2S peripherals; the second gets no data path and stays silent.
 #define SPK_DIN_PIN   15
 
-// ---- LoRa pins ----
 #define LORA_SS    5
 #define LORA_RST   14
 #define LORA_DIO0  4
 
-// ---- PTT button ----
-#define PTT_PIN    12
+// GPIO34-39 are input-only with no internal pull-up, so a button on one of
+// them floats and reads as permanently pressed. GPIO12 has a real pull-up.
+#define PTT_PIN      12
 #define DEBOUNCE_MS  50
 
-#define RX_REPORT_MS  1000
+// I2C bus, shared by the SSD1306 OLED and the PCF8575 button expander.
+#define I2C_SDA_PIN  21
+#define I2C_SCL_PIN  22
 
-// Squelch: how long after the last packet before muting the speaker. A sender
-// releasing PTT just goes quiet -- there is no end-of-transmission marker --
-// so the receiver has to notice the silence itself. One packet is ~160 ms of
-// audio, so 400 ms tolerates a dropped packet without chopping a real tail.
+// PCF8575 interrupt. The tested button sketch used GPIO4, but that is LoRa
+// DIO0 on this board -- wire INT to GPIO13 instead or the radio and the
+// keypad fight over the same pin.
+#define PCF_INT_PIN  13
+#define PCF_ADDRESS  0x20
+
+// ---- Timing ----
+#define RX_REPORT_MS   1000
+// A sender releasing PTT just goes quiet -- there is no end-of-transmission
+// marker -- so the receiver has to notice the silence itself. One packet is
+// ~160 ms of audio, so 400 ms rides out a dropped packet without cutting a
+// real transmission short.
 #define RX_SQUELCH_MS  400
 
-#define SAMPLE_RATE   8000
-
-// Mode 1300: 320 samples (40 ms) in, 52 bits = 7 bytes out, 25 frames/sec.
+// ---- Audio ----
+#define SAMPLE_RATE       8000
 #define CODEC2_MODE       CODEC2_MODE_1300
-#define FRAME_SAMPLES     320
+#define FRAME_SAMPLES     320   // 40 ms
 #define FRAME_BYTES       7
 
-// Batching 4 frames gives ~6.25 packets/sec at 28 bytes, which the link can
-// carry. The cost is ~160 ms of buffering latency each way.
+// Batching 4 frames gives ~6.25 packets/sec at 28 bytes, which the link
+// carries at roughly 23% duty cycle. Cost is ~160 ms of latency each way.
 #define FRAMES_PER_PACKET 4
 #define PACKET_BYTES      (FRAME_BYTES * FRAMES_PER_PACKET)
-
-// ---- Diagnostic tone injection ----
-// 0 = normal; 1 = tone replaces the mic; 2 = tone replaces the decoder.
-// See lib/Sound/test/tone_sweep.cpp for a DAC-only version of this test.
-#define TEST_TONE       0
-#define TONE_HZ         1000
-#define TONE_AMPLITUDE  8000
+#define FRAME_QUEUE_LEN   (FRAMES_PER_PACKET * 2)
 
 // The PCM5100A is line level with no amplifier, so this only maximises the
 // signal handed to whatever amp follows -- it cannot make a bare speaker loud.
 #define PLAYBACK_GAIN  6
 
-// Two packets' worth: enough to ride out one transmit without stalling
-// capture, small enough that a backlog cannot grow into audible lag.
-#define FRAME_QUEUE_LEN   (FRAMES_PER_PACKET * 2)
-
 Mic mic;
 Sound speaker;
 Radio radio;
 Button ptt;
+Screen screen;
+Keypad keypad;
+UI ui;
 
-// Two Codec instances, never shared between tasks. A CODEC2 handle carries
+// One Codec per direction, never shared between tasks. A CODEC2 handle carries
 // mutable per-frame state that both encode and decode write through; sharing
-// one across cores corrupts it and crashes. See lib/Codec/src/Codec.h.
-Codec encoder;   // micTask / core 0 only
-Codec decoder;   // loop() / core 1 only
+// one across cores corrupts it. See lib/Codec/src/Codec.h.
+Codec encoder;   // micTask / core 0
+Codec decoder;   // loop()  / core 1
 
-typedef struct {
-  uint8_t bytes[FRAME_BYTES];
-} EncodedFrame;
-
-QueueHandle_t frameQueue = NULL;
+FrameQueue<FRAME_BYTES, FRAME_QUEUE_LEN> frames;
 TaskHandle_t micTaskHandle = NULL;
 
 volatile bool captureEnabled = false;
-
 volatile uint32_t framesCaptured = 0;
-volatile uint32_t framesDropped = 0;
 volatile uint32_t shortReads = 0;
 
 int16_t pcmFrame[FRAME_SAMPLES];      // micTask only
 int16_t decodedFrame[FRAME_SAMPLES];  // loop() only
 uint8_t packetBuf[PACKET_BYTES];      // loop() only
 
-void micTask(void *param);
-void flushFrameQueue();
-
-void setup() {
-  Serial.begin(115200);
-  delay(500);
-  Serial.println("Walkie-talkie starting...");
-#if TEST_TONE == 1
-  Serial.printf("*** TEST_TONE 1: %d Hz replaces the mic ***\n", TONE_HZ);
-#elif TEST_TONE == 2
-  Serial.printf("*** TEST_TONE 2: %d Hz replaces the decoder ***\n", TONE_HZ);
-#endif
-
-  ptt.begin(PTT_PIN, DEBOUNCE_MS, true);
-
-  if (!encoder.begin(CODEC2_MODE) || !decoder.begin(CODEC2_MODE)) {
-    Serial.println("Codec.begin failed, halting.");
-    while (true) delay(1000);
-  }
-  if (!encoder.geometryMatches(FRAME_SAMPLES, FRAME_BYTES)) {
-    Serial.printf("Codec2 geometry mismatch: %d samples / %d bytes, halting.\n",
-                  encoder.samplesPerFrame(), encoder.bytesPerFrame());
-    while (true) delay(1000);
-  }
-  Serial.printf("Codec2 ready: %d samples -> %d bytes per frame\n",
-                encoder.samplesPerFrame(), encoder.bytesPerFrame());
-
-  MicConfig micCfg = {};
-  micCfg.sckPin = MIC_SCK_PIN;
-  micCfg.wsPin = MIC_WS_PIN;
-  micCfg.sdPin = MIC_SD_PIN;
-  micCfg.sampleRate = SAMPLE_RATE;
-  micCfg.port = I2S_NUM_0;
-  micCfg.dmaBufCount = 4;
-  micCfg.dmaBufLen = FRAME_SAMPLES;
-  micCfg.frameSamples = FRAME_SAMPLES;
-  if (!mic.begin(micCfg)) {
-    Serial.println("Mic.begin failed, halting.");
-    while (true) delay(1000);
-  }
-
-  SoundConfig spkCfg = {};
-  spkCfg.bclkPin = SPK_BCK_PIN;
-  spkCfg.lrcPin = SPK_WS_PIN;
-  spkCfg.dinPin = SPK_DIN_PIN;
-  spkCfg.sampleRate = SAMPLE_RATE;
-  spkCfg.port = I2S_NUM_1;
-  // One playFrame writes FRAME_SAMPLES stereo pairs, so a buffer smaller than
-  // that would block partway through every write and chop the audio.
-  spkCfg.dmaBufCount = 6;
-  spkCfg.dmaBufLen = FRAME_SAMPLES;
-  if (!speaker.begin(spkCfg)) {
-    Serial.println("Sound.begin failed, halting.");
-    while (true) delay(1000);
-  }
-
-  RadioConfig radioCfg = {};
-  radioCfg.ssPin = LORA_SS;
-  radioCfg.rstPin = LORA_RST;
-  radioCfg.dio0Pin = LORA_DIO0;
-  radioCfg.frequencyHz = 433E6;
-  radioCfg.syncWord = 0xF3;
-  radioCfg.txPower = 20;
-  radioCfg.spreadingFactor = 7;
-  radioCfg.bandwidthHz = 125E3;
-  radioCfg.enableCrc = true;
-  if (!radio.begin(radioCfg)) {
-    Serial.println("Radio.begin failed, halting.");
-    while (true) delay(1000);
-  }
-
-  frameQueue = xQueueCreate(FRAME_QUEUE_LEN, sizeof(EncodedFrame));
-  if (frameQueue == NULL) {
-    Serial.println("frameQueue alloc failed, halting.");
-    while (true) delay(1000);
-  }
-
-  // Pinned to core 0; loop() runs on core 1. Splitting them is what lets
-  // capture continue during a blocking transmit. Priority 2 puts it above
-  // loop() so a ready frame is encoded promptly.
-  // Stack size comes from Codec.h -- codec2 keeps large FFT buffers on the
-  // caller's stack, not in its handle.
-  BaseType_t ok = xTaskCreatePinnedToCore(
-      micTask, "micTask", CODEC_ENCODE_STACK, NULL, 2, &micTaskHandle, 0);
-  if (ok != pdPASS) {
-    Serial.println("micTask create failed, halting.");
-    while (true) delay(1000);
-  }
-
-  Serial.println("Ready. Hold the PTT button to talk.");
+// Every init step is fatal if it fails -- there is no degraded mode for a
+// radio with no mic. Halting loudly beats continuing into undefined behaviour.
+static void require(bool ok, const char *what) {
+  if (ok) return;
+  Serial.printf("%s failed, halting.\n", what);
+  while (true) delay(1000);
 }
 
-// Capture side. Runs forever, pinned opposite loop() so a blocking transmit on
-// one core cannot delay the mic on the other.
+// Capture side, pinned opposite loop() so a blocking transmit on one core
+// cannot delay the mic on the other. readFrame() blocks until a frame exists,
+// which paces this at 25 Hz and yields for free -- the mic is never unread.
 void micTask(void *param) {
   (void)param;
 
@@ -216,77 +131,106 @@ void micTask(void *param) {
       continue;
     }
 
-#if TEST_TONE == 1
-    // Tone stands in for the mic; everything downstream runs normally.
-    speaker.fillTone(pcmFrame, FRAME_SAMPLES, (float)TONE_HZ, TONE_AMPLITUDE);
-    // Pace at real time; without the mic's blocking read this would spin.
-    vTaskDelay(pdMS_TO_TICKS(1000 * FRAME_SAMPLES / SAMPLE_RATE));
-#else
     if (!mic.readFrame(pcmFrame)) {
       shortReads++;
-      continue;
+      continue;   // mic stalled; retry rather than emit a partial frame
     }
-#endif
 
-    EncodedFrame frame;
-    encoder.encode(frame.bytes, pcmFrame);
+    uint8_t bits[FRAME_BYTES];
+    encoder.encode(bits, pcmFrame);
+    frames.push(bits);   // drop-oldest on overflow, counted internally
     framesCaptured++;
-
-    // Drop-oldest on a full queue. Blocking here would just move the overflow
-    // back into the I2S DMA ring where it is invisible; discarding the stale
-    // frame keeps latency bounded and sends the most recent speech.
-    if (xQueueSend(frameQueue, &frame, 0) != pdTRUE) {
-      EncodedFrame discard;
-      if (xQueueReceive(frameQueue, &discard, 0) == pdTRUE) framesDropped++;
-      if (xQueueSend(frameQueue, &frame, 0) != pdTRUE) framesDropped++;
-    }
   }
 }
 
-void flushFrameQueue() {
-  EncodedFrame discard;
-  while (xQueueReceive(frameQueue, &discard, 0) == pdTRUE) { }
-}
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("Walkie-talkie V2 starting...");
 
-// Decode one frame and push it to the DAC.
-void playFrame(const uint8_t *bits) {
-#if TEST_TONE == 2
-  // Ignore what arrived and play a local tone. Packets are still received and
-  // counted, so this proves out the DAC and wiring without trusting the
-  // payload or the vocoder.
-  (void)bits;
-  speaker.fillTone(decodedFrame, FRAME_SAMPLES, (float)TONE_HZ, TONE_AMPLITUDE);
-#else
-  decoder.decode(decodedFrame, bits);
-#endif
-  speaker.playMono(decodedFrame, FRAME_SAMPLES, PLAYBACK_GAIN);
+  ptt.begin(PTT_PIN, DEBOUNCE_MS, true);
+
+  // Config structs default to the Codec2 voice case, so only pins are set.
+  MicConfig micCfg(MIC_SCK_PIN, MIC_WS_PIN, MIC_SD_PIN);
+  SoundConfig spkCfg(SPK_BCK_PIN, SPK_WS_PIN, SPK_DIN_PIN);
+  RadioConfig radioCfg(LORA_SS, LORA_RST, LORA_DIO0);
+
+  require(encoder.begin(CODEC2_MODE) && decoder.begin(CODEC2_MODE), "Codec.begin");
+  require(encoder.geometryMatches(FRAME_SAMPLES, FRAME_BYTES), "Codec2 geometry");
+  require(mic.begin(micCfg), "Mic.begin");
+  require(speaker.begin(spkCfg), "Sound.begin");
+  require(radio.begin(radioCfg), "Radio.begin");
+  require(frames.begin(), "FrameQueue.begin");
+
+  // I2C first: both the OLED and the button expander sit on this bus, so it
+  // is brought up once here rather than by each device.
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+
+  KeypadConfig keyCfg;
+  keyCfg.i2cAddress = PCF_ADDRESS;
+  keyCfg.intPin = PCF_INT_PIN;
+  keyCfg.debounceMs = DEBOUNCE_MS;
+  // Buttons mounted P0..P4 = up, down, left, right, enter.
+  keyCfg.upPin = 0;
+  keyCfg.downPin = 1;
+  keyCfg.leftPin = 2;
+  keyCfg.rightPin = 3;
+  keyCfg.enterPin = 4;
+
+  // The UI is not load-bearing for the radio: if the panel or expander is
+  // missing, the walkie-talkie still has to work. These are warnings, not
+  // require() calls.
+  if (!screen.begin()) Serial.println("Screen.begin failed -- running headless.");
+  if (!keypad.begin(keyCfg)) Serial.println("Keypad.begin failed -- no menu input.");
+  ui.begin(&screen, &keypad);
+
+  Serial.printf("Codec2 ready: %d samples -> %d bytes per frame\n",
+                encoder.samplesPerFrame(), encoder.bytesPerFrame());
+
+  // Core 0, above loop()'s priority so a ready frame encodes promptly. Stack
+  // size from Codec.h -- codec2 keeps large FFT buffers on the caller's stack,
+  // not in its handle, and undersizing this trips the canary mid-encode.
+  require(xTaskCreatePinnedToCore(micTask, "micTask", CODEC_ENCODE_STACK,
+                                  NULL, 2, &micTaskHandle, 0) == pdPASS,
+          "micTask create");
+
+  Serial.println("Ready. Hold the PTT button to talk.");
 }
 
 void loop() {
-  bool talking = ptt.isPressed();
   static bool wasTalking = false;
+  static unsigned long lastReport = 0;
+  static unsigned long lastPacketMs = 0;
+  static int packetsSinceReport = 0;
+  static long bytesSinceReport = 0;
+
+  bool talking = ptt.isPressed();
 
   if (talking && !wasTalking) {
-    speaker.stop();       // idempotent; safe whether or not it was playing
-    flushFrameQueue();
-    mic.flush();          // do not open with audio captured before the press
+    speaker.stop();      // idempotent
+    frames.flush();      // discard pre-press audio
+    mic.flush();
+    frames.resetCounters();
     framesCaptured = 0;
-    framesDropped = 0;
     shortReads = 0;
     captureEnabled = true;
+    ui.setAudioActive(true, true);   // freeze the menu, show the TX banner
+    ui.render();                     // one redraw now, none while transmitting
     Serial.println("PTT pressed, transmitting...");
   }
+
   if (!talking && wasTalking) {
     captureEnabled = false;
-    Serial.printf("PTT released: %u frames captured, %u dropped, %u short reads\n",
-                  (unsigned)framesCaptured, (unsigned)framesDropped,
+    Serial.printf("PTT released: %u captured, %u dropped, %u short reads\n",
+                  (unsigned)framesCaptured, (unsigned)frames.dropCount(),
                   (unsigned)shortReads);
-    // High-water marks are the smallest free stack ever seen, in bytes. If
-    // either approaches zero the canary is about to trip.
+    // High-water marks are the smallest free stack ever seen. If either nears
+    // zero the canary is about to trip -- see it coming instead of crashing.
     Serial.printf("  stack free: micTask %u B, loop %u B\n",
                   (unsigned)uxTaskGetStackHighWaterMark(micTaskHandle),
                   (unsigned)uxTaskGetStackHighWaterMark(NULL));
-    flushFrameQueue();
+    frames.flush();
+    ui.setAudioActive(false, false);   // back to the menu
     // Speaker deliberately left stopped: the receive path starts it on the
     // first arriving packet and the squelch stops it when they stop.
     Serial.println("Listening...");
@@ -294,73 +238,81 @@ void loop() {
   wasTalking = talking;
 
   if (talking) {
-    // ---- TRANSMIT: drain encoded frames from micTask -> LoRa ----
-    int framesReady = 0;
-
-    while (framesReady < FRAMES_PER_PACKET) {
-      EncodedFrame frame;
-      if (xQueueReceive(frameQueue, &frame, pdMS_TO_TICKS(200)) != pdTRUE) break;
-      memcpy(&packetBuf[framesReady * FRAME_BYTES], frame.bytes, FRAME_BYTES);
-      framesReady++;
+    // ---- TRANSMIT: drain encoded frames -> LoRa ----
+    // No mic access here; micTask keeps filling the queue throughout the
+    // blocking send below.
+    int ready = 0;
+    while (ready < FRAMES_PER_PACKET) {
+      if (!frames.pop(&packetBuf[ready * FRAME_BYTES], 200)) break;
+      ready++;
       if (!ptt.isPressed()) break;   // released mid-batch, stop keying
     }
 
-    if (framesReady > 0) {
-      radio.sendPacket(packetBuf, framesReady * FRAME_BYTES);
-    }
+    if (ready > 0) radio.sendPacket(packetBuf, ready * FRAME_BYTES);
 
-    // sendPacket blocks, so yield to let IDLE1 run and keep the Timer Group
-    // watchdog quiet (TG1WDT_SYS_RESET without this).
+    // sendPacket blocks; yield so IDLE1 runs and the Timer Group watchdog
+    // stays quiet (TG1WDT_SYS_RESET without this).
     vTaskDelay(1);
+    return;
+  }
 
-  } else {
-    // ---- RECEIVE: LoRa -> Codec2 decode -> gain -> DAC ----
-    static unsigned long lastReport = 0;
-    static int packetsSinceReport = 0;
-    static long bytesSinceReport = 0;
-    static unsigned long lastPacketMs = 0;
+  // ---- RECEIVE: LoRa -> decode -> DAC ----
+  int packetSize = radio.receivePacket(packetBuf, PACKET_BYTES);
+  if (packetSize > 0) {
+    lastPacketMs = millis();
+    bool firstOfTransmission = !speaker.isRunning();
+    speaker.start();   // idempotent; zeroes the ring on the real transition
 
-    int packetSize = radio.receivePacket(packetBuf, PACKET_BYTES);
-    if (packetSize > 0) {
-      lastPacketMs = millis();
-      speaker.start();   // idempotent; zeroes the ring on the real transition
-
-      int framesIn = packetSize / FRAME_BYTES;
-      if (framesIn > FRAMES_PER_PACKET) framesIn = FRAMES_PER_PACKET;
-
-      packetsSinceReport++;
-      bytesSinceReport += packetSize;
-
-      // No delay between frames: the frames in a packet are contiguous audio
-      // and a tick of silence between each is audible. playMono blocks on the
-      // DMA ring, which yields and paces this at real playback speed.
-      for (int f = 0; f < framesIn; f++) {
-        playFrame(&packetBuf[f * FRAME_BYTES]);
-      }
+    if (firstOfTransmission) {
+      // Redraw only on the transition into RX, not per packet -- a full panel
+      // flush costs several ms and packets arrive every ~160 ms.
+      ui.setLinkStats(radio.lastRssi(), radio.lastSnr());
+      ui.setAudioActive(true, false);
+      ui.render();
     }
 
-    unsigned long now = millis();
+    int framesIn = packetSize / FRAME_BYTES;
+    if (framesIn > FRAMES_PER_PACKET) framesIn = FRAMES_PER_PACKET;
 
-    // Squelch. A gap in packets is the only signal the sender stopped talking.
-    if (speaker.isRunning() && (now - lastPacketMs >= RX_SQUELCH_MS)) {
-      speaker.stop();
-      Serial.println("Squelch: transmission ended, speaker muted.");
-    }
+    packetsSinceReport++;
+    bytesSinceReport += packetSize;
 
-    if (now - lastReport >= RX_REPORT_MS) {
-      lastReport = now;
-      if (packetsSinceReport > 0) {
-        Serial.printf("RX %d pkt/s, %ld B, RSSI %d dBm, SNR %.1f\n",
-                      packetsSinceReport, bytesSinceReport,
-                      radio.lastRssi(), (double)radio.lastSnr());
-      } else if (framesDropped > 0 || shortReads > 0) {
-        Serial.printf("RX idle (last TX: %u dropped, %u short reads)\n",
-                      (unsigned)framesDropped, (unsigned)shortReads);
-      } else {
-        Serial.println("RX idle (no packets)");
-      }
-      packetsSinceReport = 0;
-      bytesSinceReport = 0;
+    // No delay between frames: they are contiguous audio and a tick of silence
+    // between each is audible. playMono blocks on the DMA ring, which yields
+    // and paces this at real playback speed.
+    for (int f = 0; f < framesIn; f++) {
+      decoder.decode(decodedFrame, &packetBuf[f * FRAME_BYTES]);
+      speaker.playMono(decodedFrame, FRAME_SAMPLES, PLAYBACK_GAIN);
     }
+  }
+
+  unsigned long now = millis();
+
+  // Squelch: a gap in packets is the only signal the sender stopped talking.
+  if (speaker.isRunning() && (now - lastPacketMs >= RX_SQUELCH_MS)) {
+    speaker.stop();
+    ui.setAudioActive(false, false);   // back to the menu
+    Serial.println("Squelch: transmission ended, speaker muted.");
+  }
+
+  // Menu input and redraw only run here, on the idle path. Both are no-ops
+  // while audio is active, so neither can steal time from a decode.
+  ui.update();
+  ui.render();
+
+  if (now - lastReport >= RX_REPORT_MS) {
+    lastReport = now;
+    if (packetsSinceReport > 0) {
+      Serial.printf("RX %d pkt/s, %ld B, RSSI %d dBm, SNR %.1f\n",
+                    packetsSinceReport, bytesSinceReport,
+                    radio.lastRssi(), (double)radio.lastSnr());
+    } else if (frames.dropCount() > 0 || shortReads > 0) {
+      Serial.printf("RX idle (last TX: %u dropped, %u short reads)\n",
+                    (unsigned)frames.dropCount(), (unsigned)shortReads);
+    } else {
+      Serial.println("RX idle (no packets)");
+    }
+    packetsSinceReport = 0;
+    bytesSinceReport = 0;
   }
 }
