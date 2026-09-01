@@ -45,6 +45,14 @@ Phase 2 custom PCB committed: schematic with E28-2G4M27SX (SX1281 2.4 GHz), MAX9
 
 Accompanied by `docs/Ranger_Phase2_PCB_README.md` (pin connections, power, bus assignments) and the component BOM including the charger module.
 
+<img src="../Images/Esp32_schematic.png" alt="ESP32-WROOM-32E schematic sheet: MCU, boot/reset transistor pair, CH343P USB-UART and USB-C connector" width="700" />
+
+*Schematic sheet 1 — ESP32-WROOM-32E with its net labels for the LoRa SPI bus, I2S mic and sound lines, and GPS UART; the auto-reset transistor pair driven by DTR/RTS; and the CH343P USB-UART bridge behind a USB-C connector.*
+
+<img src="../Images/PCB_design.png" alt="PCB layout editor view showing both board sides overlaid with routing" width="700" />
+
+*Board layout — front side (left) carries the 0.96" OLED connector, T9 keypad, volume pot, power switch, and charge/power LEDs; back side (right) carries the ESP32 module, LoRa footprint, USB-C, and the speaker pads.*
+
 ## 2026-08-09 — Walkie-talkie over LoRa (`e34d7f5`, `55d17b5`, `e9ae261`)
 
 First working half-duplex PTT voice link: Codec2 encode → LoRa → decode → speaker.
@@ -89,7 +97,16 @@ Speaker DMA also resized from `8 × 64` (512 samples) to `6 × 320`. A single wr
 
 **Still open:** audio is quiet and unidirectional. The DAC does not reproduce distinct frequencies: a standalone tone sweep (`test/sound/speaker_tester_range_of_freq.cpp`) sounds identical at 400 Hz and 1 kHz, which rules out the mic, Codec2, and the radio. Prime suspect is the DIN pin — the known-good `test/sound/single_tone_PCM5100A.cpp` drives DIN on **GPIO25 / I2S_NUM_0** at 44.1 kHz, while `main.cpp` uses **GPIO15 / I2S_NUM_1** at 8 kHz. Whether the DAC locks to 8 kHz without an MCLK is the second thing to check.
 
-`test/walkie_talkii/` keeps V1 (noisy, but the version whose behaviour was actually observed on hardware), V2 (same behaviour rewritten against the libraries), and V3 as reference points.
+`test/walkie_talkii/` keeps V1 (noisy, but the version whose behaviour was actually observed on hardware), V2 (same behaviour rewritten against the libraries), and V3 as reference points. `main.cpp` currently holds V2, so the UI libraries above are built and linkable but not yet wired into the firmware.
+
+**Board renders.** 3D views of the Phase 2 layout added to `Images/` and used as the README header.
+
+<p align="center">
+  <img src="../Images/Top_3D.png" alt="Phase 2 PCB top side render" width="45%" />
+  <img src="../Images/Bottom_3D.png" alt="Phase 2 PCB bottom side render" width="45%" />
+</p>
+
+*Top side (left): 0.96" OLED on a flex connector, T9 keypad with the D-pad arrows on 2/4/6/8 and Enter on 5, the VOICE2 PTT button, ON/OFF slide switch, volume pot, and the CHG/PWR indicators. Bottom side (right): ESP32-WROOM-32E, the LoRa module footprint (U2), USB-C with the CH343P bridge, BOOT and EN buttons, bulk capacitance, and the speaker pads.*
 
 ---
 

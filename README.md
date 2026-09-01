@@ -2,7 +2,12 @@
 
 A low-power, handheld communication device built on LoRa (SX1276/SX1281) and ESP32. Operates independently of cellular towers, SIM cards, subscriptions, and government-controlled infrastructure. Designed for emergency and disaster response, field operations, remote area coordination, and encrypted private messaging.
 
-![First test setup in the hardware stack](Images/First_Setup.jpeg)
+<p align="center">
+  <img src="Images/Top_3D.png" alt="Ranger Phase 2 PCB, top side: 0.96 inch OLED, T9 keypad, PTT button, power switch" width="46%" />
+  <img src="Images/Bottom_3D.png" alt="Ranger Phase 2 PCB, bottom side: ESP32-WROOM-32E, LoRa module, USB-C, buck converter" width="46%" />
+</p>
+
+<p align="center"><i>Phase 2 custom PCB &mdash; top side (OLED, T9 keypad, PTT) and bottom side (ESP32-WROOM-32E, LoRa, USB-C, power).</i></p>
 
 ---
 
