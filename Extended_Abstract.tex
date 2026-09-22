@@ -1,0 +1,225 @@
+% Use a standard class when IEEEtran is not available
+\documentclass[a4paper,10pt]{article}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+
+\begin{document}
+
+\title{Voice-First LoRa Mesh Networking: Adaptive Spreading Factor and
+Bandwidth Control with Voice-Aware Routing for Off-Grid
+Emergency Communication}
+
+\author{
+\IEEEauthorblockN{Nadeesha N. J.}
+\IEEEauthorblockA{Department of Electronic and Telecommunication Engineering\\
+University of Moratuwa\\
+Katubedda, Sri Lanka\\
+Email: your.email@uom.lk}
+}
+
+\maketitle
+
+\begin{abstract}
+% TODO: 150-200 words. Write last.
+Placeholder abstract.
+\end{abstract}
+
+\begin{IEEEkeywords}
+LoRa, mesh networking, Codec2, adaptive modulation, emergency communication
+\end{IEEEkeywords}
+
+\section{Introduction}
+% TODO
+Placeholder.
+
+\section{Literature Review}
+% TODO
+Placeholder.
+
+\section{Materials and Methods}
+% TODO
+Placeholder.
+
+%=====================================================================
+%  RESULTS AND DISCUSSION  (submitted as plan / expected approach)
+%=====================================================================
+\section{Results and Discussion}
+
+At the time of writing, the custom hardware platform is in the final
+stage of schematic development and measurement data is not yet
+available. This section therefore presents the evaluation plan: the
+metrics that will be measured, the experimental procedure used to
+obtain them, the baselines against which the system will be compared,
+and the outcomes that are expected from each experiment.
+
+\subsection{Evaluation Metrics}
+
+The central claim of this work is that a LoRa link can be tuned so
+that it delivers the highest possible speech quality for the airtime
+that it consumes. To make this claim measurable, a composite metric,
+the \emph{voice quality per unit airtime} $\eta$, is defined as
+
+\begin{equation}
+\eta = \frac{Q}{T_{\mathrm{air}}},
+\end{equation}
+
+\noindent where $Q$ is the objective speech quality score of the
+received audio on a five point scale and $T_{\mathrm{air}}$ is the
+measured on-air time in seconds required to transmit one second of
+speech. A value of $\eta$ greater than the value obtained for a fixed
+configuration indicates that the adaptive scheme has recovered
+quality without spending extra airtime.
+
+The following quantities will be logged for every trial.
+
+\begin{itemize}
+\item \textbf{Speech quality $Q$.} Objective scoring of the decoded
+      audio against the transmitted reference using ViSQOL, supported
+      by a subjective mean opinion score (MOS) panel of at least
+      fifteen listeners for a representative subset of conditions.
+\item \textbf{Intelligibility.} Word recognition rate obtained from a
+      modified rhyme test, since a compressed speech codec can score
+      poorly on quality yet remain fully understandable.
+\item \textbf{Airtime $T_{\mathrm{air}}$.} Computed from the LoRa
+      time-on-air expression for the selected spreading factor,
+      bandwidth, coding rate and payload length, and cross checked
+      against a GPIO toggle captured on a logic analyser at the
+      transmit enable pin.
+\item \textbf{Mouth to ear latency.} Measured end to end with a
+      timestamped audio marker, reported as the median and the
+      ninety-fifth percentile.
+\item \textbf{Packet delivery ratio (PDR)} and \textbf{frame erasure
+      rate}, together with the RSSI and SNR reported by the
+      transceiver for each received frame.
+\item \textbf{Transmissions per delivered frame}, which captures the
+      cost of redundancy in the mesh layer.
+\item \textbf{Channel occupancy}, the fraction of wall clock time the
+      shared channel is busy across all nodes.
+\end{itemize}
+
+\subsection{Experiment 1: Spreading Factor and Bandwidth Sweep}
+
+A two node point to point link will be characterised first, because
+the mesh results cannot be interpreted without a reliable model of the
+single hop behaviour. One node transmits a fixed set of speech samples
+drawn from a standard corpus, encoded at each of the available Codec2
+bit rates. The receiving node decodes and stores the audio for offline
+scoring.
+
+The parameter space is swept exhaustively: spreading factors SF5
+through SF12, bandwidths of 203, 406, 812 and 1625~kHz, coding rates
+of 4/5 through 4/8, and Codec2 modes at 700, 1200, 1600 and
+3200~bit/s. Each combination is repeated thirty times at each of five
+link distances, chosen to span the range from a strong link to the
+edge of the coverage area. Transmit power is held constant so that
+only modulation parameters vary. Results are reported as the mean with
+a ninety-five percent confidence interval.
+
+The outcome of this experiment is a lookup surface of $\eta$ over the
+parameter space, indexed by the measured SNR. This surface becomes the
+decision table used by the adaptive controller.
+
+\begin{table}[t]
+\caption{Planned test matrix for the link characterisation sweep}
+\label{tab:matrix}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{p{0.30\columnwidth} p{0.55\columnwidth}}
+\toprule
+\textbf{Parameter} & \textbf{Levels} \\
+\midrule
+Spreading factor & SF5 to SF12 \\
+Bandwidth        & 203, 406, 812, 1625~kHz \\
+Coding rate      & 4/5, 4/6, 4/7, 4/8 \\
+Codec2 mode      & 700, 1200, 1600, 3200~bit/s \\
+Link distance    & 5 levels, strong link to link edge \\
+Environment      & Open field, built-up campus, indoor \\
+Repetitions      & 30 per cell \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experiment 2: Closed Loop Adaptive Control}
+
+The adaptive controller selects the spreading factor, bandwidth and
+codec rate from the surface produced in Experiment~1, using the SNR
+and frame erasure rate of recent receptions as its input. Its
+behaviour will be evaluated on a walking test in which one node moves
+away from a stationary node at a constant pace until the link fails,
+then returns. Three schemes are compared under the same route and the
+same speech material:
+
+\begin{enumerate}
+\item a fixed conservative configuration, high spreading factor and
+      narrow bandwidth, representing a link tuned for worst case
+      range;
+\item a fixed aggressive configuration, low spreading factor and wide
+      bandwidth, representing a link tuned for quality;
+\item the proposed adaptive controller.
+\end{enumerate}
+
+The expected result is that the adaptive scheme matches the aggressive
+configuration for $\eta$ while the link is strong, and matches the
+conservative configuration for PDR once the link degrades, so that the
+usable communication range is extended without a proportional loss of
+speech quality. The cost that must be reported honestly is the
+settling time of the controller, that is, how many seconds of degraded
+or lost audio occur before the correct configuration is reached after
+a sudden change in channel conditions.
+
+\subsection{Experiment 3: Voice-Aware Mesh Routing}
+
+A testbed of six to eight nodes will be deployed so that the network
+diameter is at least three hops. Existing LoRa mesh implementations
+are text oriented and treat every packet identically, so a managed
+flooding scheme of the kind used by Meshtastic is adopted as the
+baseline. The proposed protocol differs in that it classifies traffic,
+gives voice frames a short deadline and drops them rather than queuing
+them once that deadline has passed, and suppresses rebroadcast of a
+voice frame by a neighbour that is not on a path toward the
+destination.
+
+Three traffic loads will be applied: voice only, voice mixed with
+periodic position reports, and a congested load in which two voice
+streams share the network. For each load the protocols are compared on
+delivery ratio, ninety-fifth percentile latency, transmissions per
+delivered frame and channel occupancy.
+
+The expected result is a reduction in transmissions per delivered
+frame and in tail latency relative to managed flooding, obtained
+because stale voice frames are discarded instead of consuming airtime
+that a fresher frame needs. The anticipated trade-off is a lower
+delivery ratio for non-urgent text traffic during voice activity,
+which will be quantified rather than avoided.
+
+\subsection{Threats to Validity}
+
+Three risks are recognised. First, objective speech quality metrics
+are validated mainly on telephone band codecs and may correlate poorly
+with listener judgement at very low bit rates, which is why the
+subjective panel is retained. Second, outdoor field results depend on
+weather, foliage and interference in the shared 2.4~GHz band, so every
+comparison is run within a single session and interference is logged
+with a spectrum capture. Third, a testbed of eight nodes cannot
+demonstrate behaviour at the scale of a large deployment, so the
+measured per hop behaviour will be used to parameterise a simulation
+for the larger case, and the simulation will be reported as an
+extrapolation rather than as a measurement.
+
+\section{Conclusion}
+% TODO
+Placeholder.
+
+\section*{Acknowledgment}
+% TODO
+
+\begin{thebibliography}{1}
+\bibitem{ref1}
+Placeholder reference.
+\end{thebibliography}
+
+\end{document}
